@@ -1,0 +1,19 @@
+{
+  "name": "bot-ai",
+  "version": "1.0.0",
+  "description": "Bot AI \u2014 \u0441\u043a\u0430\u043d\u0435\u0440 \u043a\u043e\u0442\u0438\u0440\u043e\u0432\u043e\u043a Pocket Option",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "telegraf": "^4.16.3",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
