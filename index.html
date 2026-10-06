@@ -912,30 +912,70 @@
     </style>
     <style>
         :root {
-            --neon-green: #e7b15a;
-            --neon-purple: #8fd0c6;
-            --neon-red: #e07a6a;
+            --neon-green: #d7deea;
+            --neon-purple: #8eb4ff;
+            --neon-red: #ff3355;
+            --up: #19d36b;
+            --down: #ff3355;
+            --ink: #07080d;
+            --card: #141824;
+            --line: rgba(215, 222, 234, 0.22);
         }
-        html, body { margin: 0; background: #1b1410; color: #f6efe4; font-family: Inter, system-ui, sans-serif; }
-        body { background: radial-gradient(1200px 600px at 20% -10%, #3a2a1c 0%, #1b1410 55%); }
+        html, body {
+            margin: 0;
+            background: #07080d !important;
+            color: #f4f7fb !important;
+            font-family: Inter, system-ui, sans-serif;
+        }
+        body {
+            background:
+                radial-gradient(900px 420px at 50% -10%, rgba(90, 120, 190, 0.18), transparent 60%),
+                #07080d !important;
+        }
         .screen { display: none; }
         .screen.active { display: block; }
-        #gate-screen, #home-screen, #bot-analysis-screen { min-height: 100dvh; padding: 28px 18px 36px; }
-        .gate-card, .home-card {
-            max-width: 420px; margin: 12vh auto 0; padding: 28px 22px; border-radius: 28px;
-            background: rgba(42, 30, 22, 0.92); border: 1px solid rgba(231, 177, 90, 0.35);
-            box-shadow: 0 20px 60px rgba(0,0,0,.35);
+        #gate-screen, #home-screen, #bot-analysis-screen { min-height: 100dvh; padding: 22px 16px 32px; background: transparent; }
+        .gate-card, .home-card, .glass-box, .search-box, .pair-row, .analysis-final {
+            background: #141824 !important;
+            border: 1px solid rgba(215, 222, 234, 0.18) !important;
+            box-shadow: none !important;
+            color: #f4f7fb !important;
         }
-        .brand { letter-spacing: 3px; font-size: 12px; font-weight: 800; color: #e7b15a; text-align: center; }
-        h1.home-title { margin: 10px 0 8px; text-align: center; font-size: 28px; color: #f6efe4; }
-        .home-sub { text-align: center; color: #cbbba6; font-size: 14px; line-height: 1.5; margin-bottom: 22px; }
+        .gate-card, .home-card { max-width: 420px; margin: 14vh auto 0; padding: 28px 22px; border-radius: 28px; }
+        .brand { letter-spacing: 4px; font-size: 12px; font-weight: 800; color: #8eb4ff; text-align: center; }
+        h1.home-title, h2, #bot-analysis-screen h2 {
+            color: #f7f8fb !important;
+            text-shadow: none !important;
+        }
+        .home-sub, #tf-hint { color: #b7c0d0 !important; }
+        .only-btn, .back-btn, .tf-btn {
+            background: #1c2230 !important;
+            color: #f4f7fb !important;
+            border: 1px solid rgba(215, 222, 234, 0.28) !important;
+            box-shadow: none !important;
+            border-radius: 16px !important;
+        }
         .only-btn {
-            width: 100%; border: 0; border-radius: 18px; padding: 18px 16px; font-size: 16px; font-weight: 900;
-            letter-spacing: .4px; background: linear-gradient(180deg, #f0c27a, #c9842a); color: #2a1b0e; cursor: pointer;
+            width: 100%; padding: 18px 16px; font-size: 16px; font-weight: 900; letter-spacing: .3px;
+            background: #f4f7fb !important; color: #10131a !important; border: 0 !important;
         }
-        #bot-analysis-screen h2 { color: #e7b15a; }
-        .back-btn, .tf-btn { background: #2c2118 !important; color: #f6efe4 !important; border: 1px solid rgba(231,177,90,.35) !important; }
-        .pair-row { background: rgba(42,30,22,.8) !important; border-color: rgba(231,177,90,.22) !important; }
+        #tf-1, #cat-forex {
+            background: #f4f7fb !important;
+            color: #10131a !important;
+            border: 0 !important;
+        }
+        .search-input {
+            background: #0d1018 !important;
+            color: #f4f7fb !important;
+            border: 1px solid rgba(215, 222, 234, 0.2) !important;
+        }
+        .pair-row { border-radius: 16px !important; padding: 14px 16px !important; }
+        .po-price.up, .final-dir.up, .po-side.call, #scan-call-side { color: #19d36b !important; background: rgba(25, 211, 107, 0.12) !important; }
+        .po-price.down, .final-dir.down, .po-side.put, #scan-put-side { color: #ff3355 !important; background: rgba(255, 51, 85, 0.12) !important; }
+        .ta-verdict.up, .signal-up { color: #19d36b !important; }
+        .ta-verdict.down, .signal-down { color: #ff3355 !important; }
+        #fullscreen-radar.fullscreen-overlay { background: #07080d !important; }
+        .po-hud, .po-desk { background: #10141d !important; border-color: rgba(215,222,234,.16) !important; }
     </style>
 </head>
 <body>
@@ -1082,13 +1122,13 @@
             Object.keys(data.categories).forEach(function (name) { total += (data.categories[name] || []).length; });
             if (countEl) countEl.textContent = String(total);
             if (!rows.length) {
-                box.innerHTML = "<div style=\"color:#cbbba6;text-align:center;padding:28px;font-weight:700;\">В этой категории пар нет.</div>";
+                box.innerHTML = "<div style=\"color:#b7c0d0;text-align:center;padding:28px;font-weight:700;\">В этой категории пар нет.</div>";
                 return;
             }
             box.innerHTML = rows.map(function (row) {
                 var name = row.display || row.symbol;
                 var closed = row.active === false;
-                return "<div class=\"pair-row\" data-pair=\"" + String(name).replace(/"/g, "") + "\" style=\"opacity:" + (closed ? "0.45" : "1") + "\"><span>" + name + "</span><span style=\"color:#e7b15a;font-weight:900;\">" + (row.payout || 0) + "%</span></div>";
+                return "<div class=\"pair-row\" data-pair=\"" + String(name).replace(/"/g, "") + "\" style=\"opacity:" + (closed ? "0.45" : "1") + "\"><span>" + name + "</span><span style=\"color:#f4f7fb;font-weight:900;\">" + (row.payout || 0) + "%</span></div>";
             }).join("");
             box.querySelectorAll(".pair-row").forEach(function (row) {
                 row.addEventListener("click", function () {
@@ -1098,7 +1138,7 @@
         }
         async function loadPairs() {
             var box = document.getElementById("analysis-pairs-render-box");
-            if (box && !PAIR_CACHE) box.innerHTML = "<div style=\"color:#cbbba6;text-align:center;padding:28px;font-weight:700;\">Загрузка пар Pocket Option…</div>";
+            if (box && !PAIR_CACHE) box.innerHTML = "<div style=\"color:#b7c0d0;text-align:center;padding:28px;font-weight:700;\">Загрузка пар Pocket Option…</div>";
             var urls = [location.origin + "/api/payouts", "https://vip-community.onrender.com/api/payouts"];
             var lastErr = "";
             for (var i = 0; i < urls.length; i++) {
@@ -1139,7 +1179,7 @@
         window.openScanner = openScanner;
         try {
             var tgApp = window.Telegram && window.Telegram.WebApp;
-            if (tgApp) { tgApp.ready(); tgApp.expand(); if (tgApp.setHeaderColor) tgApp.setHeaderColor("#1b1410"); }
+            if (tgApp) { tgApp.ready(); tgApp.expand(); if (tgApp.setHeaderColor) tgApp.setHeaderColor("#07080d"); }
         } catch (e) {}
 
         function switchScreen(screenId) {
