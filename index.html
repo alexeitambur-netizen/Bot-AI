@@ -1028,8 +1028,7 @@
         </div>
     </div>
     <script>
-        const SERVER_URL = (window.SERVER_URL || "https://vip-community.onrender.com").replace(/\/$/, "");
-        window.SERVER_URL = SERVER_URL;
+        window.SERVER_URL = "https://vip-community.onrender.com";
         try {
             var tg = window.Telegram && window.Telegram.WebApp;
             if (tg) { tg.ready(); tg.expand(); if (tg.setHeaderColor) tg.setHeaderColor("#05080d"); }
@@ -1042,199 +1041,74 @@
         }
         window.switchScreen = switchScreen;
 
-        const ASSET_CATEGORIES = { forex: [], crypto: [], commodities: [], stocks: [], indices: [] };
-            // ==================== УЛУЧШЕННЫЙ СКАНЕР С КАТЕГОРИЯМИ + ТАЙМФРЕЙМ ====================
-            let currentAssetCategory = 'forex'; // По умолчанию открываем раздел "Валюты"
-            let currentScanTimeframe = 1; // По умолчанию M1 (1 минута)
+        var ASSET_CATEGORIES = { forex: [], crypto: [], commodities: [], stocks: [], indices: [] };
+        var currentAssetCategory = "forex";
+        var currentScanTimeframe = 1;
 
-            function setScanTimeframe(mins) {
-                currentScanTimeframe = mins;
-                
-                // Подсветка активной кнопки таймфрейма
-                document.querySelectorAll('.tf-btn').forEach(btn => {
-                    btn.style.background = 'rgba(255,255,255,0.06)';
-                    btn.style.color = '#fff';
-                    btn.style.border = '1px solid rgba(255,255,255,0.12)';
-                    btn.style.boxShadow = 'none';
-                });
-                const activeTf = document.getElementById('tf-' + mins);
-                if (activeTf) {
-                    activeTf.style.background = 'var(--neon-green)';
-                    activeTf.style.color = '#000';
-                    activeTf.style.border = 'none';
-                    activeTf.style.boxShadow = '0 0 14px rgba(0,255,170,0.45)';
-                }
-
-                // Обновляем подсказку
-                const hint = document.getElementById('tf-hint');
-                if (hint) {
-                    const labels = {1:'1-минутном', 2:'2-минутном', 3:'3-минутном', 5:'5-минутном', 10:'10-минутном', 15:'15-минутном'};
-                    hint.innerHTML = `Сейчас: <span style="color:var(--neon-green); font-weight:900;">M${mins}</span> • Анализ на ${labels[mins] || mins + '-минутном'} таймфрейме`;
-                }
-
-                // Haptic feedback если доступен
-                if (typeof triggerHaptic === 'function') triggerHaptic('light');
+        function setScanTimeframe(mins) {
+            currentScanTimeframe = mins;
+            document.querySelectorAll(".tf-btn").forEach(function (btn) {
+                btn.style.background = "rgba(255,255,255,0.06)";
+                btn.style.color = "#fff";
+                btn.style.border = "1px solid rgba(255,255,255,0.12)";
+                btn.style.boxShadow = "none";
+            });
+            var activeTf = document.getElementById("tf-" + mins);
+            if (activeTf) {
+                activeTf.style.background = "var(--neon-green)";
+                activeTf.style.color = "#000";
+                activeTf.style.border = "none";
+                activeTf.style.boxShadow = "0 0 14px rgba(0,255,170,0.45)";
             }
-            window.setScanTimeframe = setScanTimeframe;
-
-            function setAssetCategory(category) {
-                currentAssetCategory = category;
-                
-                // Highlight active button (только реальные категории)
-                document.querySelectorAll('[id^="cat-"]').forEach(btn => {
-                    btn.style.background = 'rgba(255,255,255,0.05)';
-                    btn.style.color = '#fff';
-                });
-                const activeBtn = document.getElementById('cat-' + category);
-                if (activeBtn) {
-                    activeBtn.style.background = 'var(--neon-green)';
-                    activeBtn.style.color = '#000';
-                }
-                
-                // Принудительно обновляем список
-                const searchInput = document.getElementById('analysis-search-input');
-                if (searchInput) searchInput.value = '';
-                
-                window.filterAnalysisPairs();
+            var hint = document.getElementById("tf-hint");
+            if (hint) {
+                var labels = {1:"1-минутном", 2:"2-минутном", 3:"3-минутном", 5:"5-минутном", 10:"10-минутном", 15:"15-минутном"};
+                hint.innerHTML = "Сейчас: <span style=\"color:var(--neon-green); font-weight:900;\">M" + mins + "</span> • Анализ на " + (labels[mins] || (mins + "-минутном")) + " таймфрейме";
             }
-            window.setAssetCategory = setAssetCategory;
+        }
+        window.setScanTimeframe = setScanTimeframe;
 
-            function populateAnalysisPairs(filteredList) {
-                const renderBox = document.getElementById('analysis-pairs-render-box');
-                if (!renderBox) return;
-                renderBox.innerHTML = '';
-                
-                if (filteredList.length === 0) {
-                    renderBox.innerHTML = `<div style="color:#a4b1cd; text-align:center; font-size:13px; padding:30px; font-weight:600;">Тикер не найден в этой категории.</div>`;
-                    return;
-                }
-
-                filteredList.forEach(pair => {
-                    const row = document.createElement('div');
-                    row.className = 'pair-row';
-                    row.addEventListener('click', () => window.launchFullscreenAnalysis(pair));
-                    
-                    // Add small category badge
-                    let catBadge = '';
-                    if (ASSET_CATEGORIES.forex.includes(pair)) catBadge = '<span style="font-size:9px; background:rgba(0,255,170,0.2); padding:1px 6px; border-radius:8px; margin-left:8px;">FX</span>';
-                    else if (ASSET_CATEGORIES.crypto.includes(pair)) catBadge = '<span style="font-size:9px; background:rgba(157,0,255,0.2); padding:1px 6px; border-radius:8px; margin-left:8px;">CRYPTO</span>';
-                    else if (ASSET_CATEGORIES.commodities.includes(pair)) catBadge = '<span style="font-size:9px; background:rgba(255,200,0,0.2); padding:1px 6px; border-radius:8px; margin-left:8px;">COMMODITY</span>';
-                    else if (ASSET_CATEGORIES.stocks.includes(pair)) catBadge = '<span style="font-size:9px; background:rgba(0,150,255,0.2); padding:1px 6px; border-radius:8px; margin-left:8px;">STOCK</span>';
-                    else if (ASSET_CATEGORIES.indices.includes(pair)) catBadge = '<span style="font-size:9px; background:rgba(255,100,100,0.2); padding:1px 6px; border-radius:8px; margin-left:8px;">INDEX</span>';
-                    
-                    row.innerHTML = `<span>${pair}${catBadge}</span> <span style="color:var(--neon-green); font-size:13px; font-weight:900;">Анализ →</span>`;
-                    renderBox.appendChild(row);
-                });
+        function setAssetCategory(category) {
+            currentAssetCategory = category;
+            document.querySelectorAll("[id^='cat-']").forEach(function (btn) {
+                btn.style.background = "rgba(255,255,255,0.05)";
+                btn.style.color = "#fff";
+            });
+            var activeBtn = document.getElementById("cat-" + category);
+            if (activeBtn) {
+                activeBtn.style.background = "var(--neon-green)";
+                activeBtn.style.color = "#000";
             }
+            var searchInput = document.getElementById("analysis-search-input");
+            if (searchInput) searchInput.value = "";
+            if (typeof window.filterAnalysisPairs === "function") window.filterAnalysisPairs();
+        }
+        window.setAssetCategory = setAssetCategory;
 
-            function filterAnalysisPairs() {
-                if (window.__SLV_LIVE_PAIRS__) return;
-                const renderBox = document.getElementById('analysis-pairs-render-box');
-                if (!renderBox) return;
-                renderBox.innerHTML = '<div style="color:#a4b1cd;text-align:center;font-size:13px;padding:30px;font-weight:600;">Загрузка пар Pocket Option…</div>';
-            }
-            window.filterAnalysisPairs = filterAnalysisPairs;
+        function filterAnalysisPairs() {
+            if (window.__SLV_LIVE_PAIRS__) return;
+            var renderBox = document.getElementById("analysis-pairs-render-box");
+            if (!renderBox) return;
+            renderBox.innerHTML = "<div style=\"color:#a4b1cd;text-align:center;font-size:13px;padding:30px;font-weight:600;\">Загрузка пар Pocket Option…</div>";
+        }
+        window.filterAnalysisPairs = filterAnalysisPairs;
 
-            function launchFullscreenAnalysis(pairName) {
-                const overlay = document.getElementById('fullscreen-radar');
-                const statusText = document.getElementById('radar-status-text');
-                const finalBlock = document.getElementById('radar-final-result');
-                const radarAnim = document.getElementById('radar-animation-element');
-                const marketView = document.getElementById('scanning-market-view');
-                const scanningPairName = document.getElementById('scanning-pair-name');
-                const scanningTfLabel = document.getElementById('scanning-tf-label');
-                const taSummaryLabel = document.getElementById('ta-summary-tf-label');
+        function launchFullscreenAnalysis(pairName) {
+            var overlay = document.getElementById("fullscreen-radar");
+            if (!overlay) return;
+            overlay.style.setProperty("display", "flex", "important");
+            var name = document.getElementById("scanning-pair-name");
+            if (name) name.textContent = pairName;
+        }
+        window.launchFullscreenAnalysis = launchFullscreenAnalysis;
 
-                const tf = currentScanTimeframe || 1;
-                const tfLabel = 'M' + tf;
+        window.closeFullscreenAnalysis = function () {
+            var overlay = document.getElementById("fullscreen-radar");
+            var marketView = document.getElementById("scanning-market-view");
+            if (overlay) overlay.style.setProperty("display", "none", "important");
+            if (marketView) marketView.style.display = "none";
+        };
 
-                if(!overlay) return;
-                overlay.style.setProperty('display', 'flex', 'important');
-                if(radarAnim) radarAnim.style.display = 'flex';
-                if(statusText) {
-                    statusText.style.display = 'block';
-                    statusText.innerText = `СКАНИРОВАНИЕ ${tfLabel} • ОБРАБОТКА МАССИВА...`;
-                }
-                if(finalBlock) finalBlock.style.display = 'none';
-                if(marketView) marketView.style.display = 'block';
-                if(scanningPairName) scanningPairName.innerText = pairName;
-                if(scanningTfLabel) scanningTfLabel.innerText = `АНАЛИЗ РЫНКА • ${tfLabel}`;
-
-                // Немного разная длительность сканирования в зависимости от ТФ
-                const scanDelay = 2200 + (tf * 80);
-
-                setTimeout(() => {
-                    if(radarAnim) radarAnim.style.display = 'none';
-                    if(statusText) statusText.style.display = 'none';
-                    if(marketView) marketView.style.display = 'none';
-                    if(finalBlock) finalBlock.style.display = 'block';
-                    
-                    document.getElementById('analyzed-pair-title').innerText = pairName + '  •  ' + tfLabel;
-                    if(taSummaryLabel) taSummaryLabel.innerText = `Техническая сводка (${tfLabel})`;
-                    
-                    let basePrice = pairName.includes("JPY") ? 155.20 : 1.0850;
-                    // Для больших ТФ — чуть больше "шум" (волатильность)
-                    const volatilityFactor = 0.0006 + (tf * 0.00008);
-                    let candles = [];
-                    for(let i=0; i<20; i++) {
-                        basePrice += (Math.random() - 0.5) * (basePrice * volatilityFactor);
-                        candles.push(basePrice);
-                    }
-                    
-                    let currentPrice = candles[candles.length - 1];
-                    let sum9 = 0, sum20 = 0;
-                    candles.slice(-9).forEach(p => sum9 += p);
-                    candles.forEach(p => sum20 += p);
-                    let sma9 = sum9 / 9;
-                    let sma20 = sum20 / 20;
-                    let rsi = Math.floor(Math.random() * (78 - 24 + 1)) + 24;
-                    // Волатильность чуть выше на старших ТФ
-                    let vol = (Math.random() * 0.35 + 0.08 + (tf * 0.008)).toFixed(2);
-                    let score = 0; 
-                    if(currentPrice > sma9) score++; else score--;
-                    if(sma9 > sma20) score++; else score--;
-                    if(rsi < 30) score += 2; 
-                    if(rsi > 70) score -= 2; 
-
-                    let isUp = score >= 0;
-                    // На старших ТФ точность чуть выше (стабильнее сигнал)
-                    let accuracyBase = 76 + Math.min(tf, 10);
-                    let accuracy = Math.floor(Math.random() * (96 - accuracyBase + 1)) + accuracyBase;
-                    let precision = pairName.includes("JPY") ? 3 : 5;
-                    document.getElementById('ta-rsi-val').innerText = rsi;
-                    document.getElementById('ta-sma9-val').innerText = sma9.toFixed(precision);
-                    document.getElementById('ta-sma20-val').innerText = sma20.toFixed(precision);
-                    document.getElementById('ta-vol-val').innerText = vol + '%';
-
-                    const verdictBox = document.getElementById('ta-verdict-box');
-                    const arrow = document.getElementById('final-direction-arrow');
-                    const fill = document.getElementById('final-progress-fill');
-
-                    document.getElementById('final-accuracy-percent').innerText = accuracy + '%';
-                    fill.style.width = accuracy + '%';
-
-                    if(isUp) {
-                        arrow.innerText = "LONG (ВВЕРХ) ▲";
-                        arrow.className = "final-dir up";
-                        fill.style.background = "var(--neon-green)";
-                        fill.style.boxShadow = "0 0 20px var(--neon-green)";
-                        verdictBox.innerText = score >= 2 ? `СТРОГИЙ LONG • ${tfLabel}` : `УМЕРЕННЫЙ LONG • ${tfLabel}`;
-                        verdictBox.className = "ta-verdict buy";
-                    } else {
-                        arrow.innerText = "SHORT (ВНИЗ) ▼";
-                        arrow.className = "final-dir down";
-                        fill.style.background = "var(--neon-red)";
-                        fill.style.boxShadow = "0 0 20px var(--neon-red)";
-                        verdictBox.innerText = score <= -2 ? `СТРОГИЙ SHORT • ${tfLabel}` : `УМЕРЕННЫЙ SHORT • ${tfLabel}`;
-                        verdictBox.className = "ta-verdict sell";
-                    }
-                }, scanDelay); 
-            }
-            window.closeFullscreenAnalysis = function() {
-                const overlay = document.getElementById('fullscreen-radar');
-                const marketView = document.getElementById('scanning-market-view');
-                if(overlay) overlay.style.setProperty('display', 'none', 'important');
-                if(marketView) marketView.style.display = 'none';
         document.addEventListener("DOMContentLoaded", function () {
             switchScreen("bot-analysis-screen");
             if (typeof window.filterAnalysisPairs === "function") window.filterAnalysisPairs();

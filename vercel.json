@@ -1,9 +1,9 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "**",
-      "use": "@vercel/static"
-    }
+  "functions": {
+    "api/**/*.js": { "maxDuration": 30 }
+  },
+  "rewrites": [
+    { "source": "/api/po/health", "destination": "/api/po/health" }
   ]
 }
