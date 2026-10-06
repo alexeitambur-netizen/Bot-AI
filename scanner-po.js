@@ -12,12 +12,8 @@
   function $(id) { return document.getElementById(id); }
 
   function apiBase() {
-    try {
-      var saved = localStorage.getItem('po_api_url');
-      if (saved) return String(saved).replace(/\/$/, '');
-    } catch (e) {}
+    if (location.origin && location.origin.indexOf('http') === 0 && location.hostname !== 'github.com') return location.origin;
     if (window.SERVER_URL) return String(window.SERVER_URL).replace(/\/$/, '');
-    if (location.origin && location.origin.indexOf('http') === 0) return location.origin;
     return PO_API;
   }
 

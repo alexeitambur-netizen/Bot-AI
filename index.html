@@ -987,7 +987,7 @@
             </div>
 
             <div class="search-box">
-                <input type="text" id="analysis-search-input" class="search-input" placeholder="Поиск тикера (EUR/USD, BTC, AAPL, US30...)" oninput="window.filterAnalysisPairs()">
+                <input type="text" id="analysis-search-input" class="search-input" placeholder="Поиск тикера (EUR/USD, BTC, AAPL, US30...)" oninput="if (window.loadPairs && PAIR_CACHE) paintPairs(PAIR_CACHE); window.filterAnalysisPairs && window.filterAnalysisPairs()">
                 <div class="pairs-list" id="analysis-pairs-render-box" style="max-height: 420px;"></div>
             </div>
             
@@ -1067,7 +1067,56 @@
         </div>
     </div>
     <script>
-        window.SERVER_URL = "https://vip-community.onrender.com";
+        window.SERVER_URL = location.origin;
+        var PAIR_CACHE = null;
+        function paintPairs(data) {
+            var box = document.getElementById("analysis-pairs-render-box");
+            var countEl = document.getElementById("total-assets-count");
+            if (!box || !data || !data.categories) return;
+            var map = { forex: "currencies", crypto: "crypto", commodities: "commodities", stocks: "stocks", indices: "indices" };
+            var key = map[currentAssetCategory] || "currencies";
+            var rows = (data.categories[key] || []).slice().sort(function (a, b) { return (b.payout || 0) - (a.payout || 0); });
+            var q = ((document.getElementById("analysis-search-input") || {}).value || "").toUpperCase().trim();
+            if (q) rows = rows.filter(function (row) { return String(row.display || row.symbol || "").toUpperCase().indexOf(q) !== -1; });
+            var total = 0;
+            Object.keys(data.categories).forEach(function (name) { total += (data.categories[name] || []).length; });
+            if (countEl) countEl.textContent = String(total);
+            if (!rows.length) {
+                box.innerHTML = "<div style=\"color:#cbbba6;text-align:center;padding:28px;font-weight:700;\">В этой категории пар нет.</div>";
+                return;
+            }
+            box.innerHTML = rows.map(function (row) {
+                var name = row.display || row.symbol;
+                var closed = row.active === false;
+                return "<div class=\"pair-row\" data-pair=\"" + String(name).replace(/"/g, "") + "\" style=\"opacity:" + (closed ? "0.45" : "1") + "\"><span>" + name + "</span><span style=\"color:#e7b15a;font-weight:900;\">" + (row.payout || 0) + "%</span></div>";
+            }).join("");
+            box.querySelectorAll(".pair-row").forEach(function (row) {
+                row.addEventListener("click", function () {
+                    if (typeof window.launchFullscreenAnalysis === "function") window.launchFullscreenAnalysis(row.getAttribute("data-pair"));
+                });
+            });
+        }
+        async function loadPairs() {
+            var box = document.getElementById("analysis-pairs-render-box");
+            if (box && !PAIR_CACHE) box.innerHTML = "<div style=\"color:#cbbba6;text-align:center;padding:28px;font-weight:700;\">Загрузка пар Pocket Option…</div>";
+            var urls = [location.origin + "/api/payouts", "https://vip-community.onrender.com/api/payouts"];
+            var lastErr = "";
+            for (var i = 0; i < urls.length; i++) {
+                try {
+                    var res = await fetch(urls[i], { cache: "no-store" });
+                    if (!res.ok) throw new Error("http " + res.status);
+                    var data = await res.json();
+                    var n = data && data.categories && data.categories.currencies && data.categories.currencies.length;
+                    if (!n) throw new Error("empty");
+                    PAIR_CACHE = data;
+                    window.SERVER_URL = urls[i].replace(/\/api\/payouts$/, "");
+                    paintPairs(data);
+                    return;
+                } catch (e) { lastErr = e && e.message ? e.message : "fail"; }
+            }
+            if (box) box.innerHTML = "<div style=\"color:#e07a6a;text-align:center;padding:28px;font-weight:700;\">Пары не пришли: " + lastErr + "</div>";
+        }
+        window.loadPairs = loadPairs;
         var ALLOWED_IDS = { "8331663933": 1, "5817328317": 1 };
         function telegramUserId() {
             try {
@@ -1084,6 +1133,7 @@
         function openScanner() {
             if (!ALLOWED_IDS[telegramUserId()]) return showOnly("gate-screen");
             showOnly("bot-analysis-screen");
+            loadPairs();
             if (typeof window.filterAnalysisPairs === "function") window.filterAnalysisPairs();
         }
         window.openScanner = openScanner;
@@ -1139,15 +1189,15 @@
             }
             var searchInput = document.getElementById("analysis-search-input");
             if (searchInput) searchInput.value = "";
+            if (PAIR_CACHE) paintPairs(PAIR_CACHE);
             if (typeof window.filterAnalysisPairs === "function") window.filterAnalysisPairs();
         }
         window.setAssetCategory = setAssetCategory;
 
         function filterAnalysisPairs() {
             if (window.__SLV_LIVE_PAIRS__) return;
-            var renderBox = document.getElementById("analysis-pairs-render-box");
-            if (!renderBox) return;
-            renderBox.innerHTML = "<div style=\"color:#a4b1cd;text-align:center;font-size:13px;padding:30px;font-weight:600;\">Загрузка пар Pocket Option…</div>";
+            if (PAIR_CACHE) return paintPairs(PAIR_CACHE);
+            loadPairs();
         }
         window.filterAnalysisPairs = filterAnalysisPairs;
 
