@@ -911,13 +911,52 @@
 
     </style>
     <style>
-        body { margin: 0; background: #05080d; color: #fff; font-family: Inter, system-ui, sans-serif; }
-        #bot-analysis-screen { display: block; min-height: 100dvh; padding: 18px 14px 28px; }
-        #bot-analysis-screen h2 { margin-top: 8px; }
+        :root {
+            --neon-green: #e7b15a;
+            --neon-purple: #8fd0c6;
+            --neon-red: #e07a6a;
+        }
+        html, body { margin: 0; background: #1b1410; color: #f6efe4; font-family: Inter, system-ui, sans-serif; }
+        body { background: radial-gradient(1200px 600px at 20% -10%, #3a2a1c 0%, #1b1410 55%); }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        #gate-screen, #home-screen, #bot-analysis-screen { min-height: 100dvh; padding: 28px 18px 36px; }
+        .gate-card, .home-card {
+            max-width: 420px; margin: 12vh auto 0; padding: 28px 22px; border-radius: 28px;
+            background: rgba(42, 30, 22, 0.92); border: 1px solid rgba(231, 177, 90, 0.35);
+            box-shadow: 0 20px 60px rgba(0,0,0,.35);
+        }
+        .brand { letter-spacing: 3px; font-size: 12px; font-weight: 800; color: #e7b15a; text-align: center; }
+        h1.home-title { margin: 10px 0 8px; text-align: center; font-size: 28px; color: #f6efe4; }
+        .home-sub { text-align: center; color: #cbbba6; font-size: 14px; line-height: 1.5; margin-bottom: 22px; }
+        .only-btn {
+            width: 100%; border: 0; border-radius: 18px; padding: 18px 16px; font-size: 16px; font-weight: 900;
+            letter-spacing: .4px; background: linear-gradient(180deg, #f0c27a, #c9842a); color: #2a1b0e; cursor: pointer;
+        }
+        #bot-analysis-screen h2 { color: #e7b15a; }
+        .back-btn, .tf-btn { background: #2c2118 !important; color: #f6efe4 !important; border: 1px solid rgba(231,177,90,.35) !important; }
+        .pair-row { background: rgba(42,30,22,.8) !important; border-color: rgba(231,177,90,.22) !important; }
     </style>
 </head>
 <body>
-    <div class="screen active" id="bot-analysis-screen">
+
+    <div class="screen" id="gate-screen">
+        <div class="gate-card">
+            <div class="brand">BOT AI</div>
+            <h1 class="home-title">Нет доступа</h1>
+            <p class="home-sub" id="gate-text">Это приложение открывается только для двух Telegram ID.</p>
+        </div>
+    </div>
+    <div class="screen" id="home-screen">
+        <div class="home-card">
+            <div class="brand">BOT AI</div>
+            <h1 class="home-title">Котировки</h1>
+            <p class="home-sub">Одна кнопка. Дальше только сканер пар Pocket Option.</p>
+            <button class="only-btn" type="button" onclick="openScanner()">Сканер котировок</button>
+        </div>
+    </div>
+
+    <div class="screen" id="bot-analysis-screen">
             <h2>🔍 СКАНЕР PRO — ВСЕ АКТИВЫ POCKET OPTION</h2>
             
             <!-- ==================== ТАЙМФРЕЙМ СКАНИРОВАНИЯ ==================== -->
@@ -1029,9 +1068,28 @@
     </div>
     <script>
         window.SERVER_URL = "https://vip-community.onrender.com";
+        var ALLOWED_IDS = { "8331663933": 1, "5817328317": 1 };
+        function telegramUserId() {
+            try {
+                var tg = window.Telegram && window.Telegram.WebApp;
+                var user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+                return user && user.id ? String(user.id) : "";
+            } catch (e) { return ""; }
+        }
+        function showOnly(id) {
+            document.querySelectorAll(".screen").forEach(function (el) { el.classList.remove("active"); });
+            var next = document.getElementById(id);
+            if (next) next.classList.add("active");
+        }
+        function openScanner() {
+            if (!ALLOWED_IDS[telegramUserId()]) return showOnly("gate-screen");
+            showOnly("bot-analysis-screen");
+            if (typeof window.filterAnalysisPairs === "function") window.filterAnalysisPairs();
+        }
+        window.openScanner = openScanner;
         try {
-            var tg = window.Telegram && window.Telegram.WebApp;
-            if (tg) { tg.ready(); tg.expand(); if (tg.setHeaderColor) tg.setHeaderColor("#05080d"); }
+            var tgApp = window.Telegram && window.Telegram.WebApp;
+            if (tgApp) { tgApp.ready(); tgApp.expand(); if (tgApp.setHeaderColor) tgApp.setHeaderColor("#1b1410"); }
         } catch (e) {}
 
         function switchScreen(screenId) {
@@ -1110,8 +1168,14 @@
         };
 
         document.addEventListener("DOMContentLoaded", function () {
-            switchScreen("bot-analysis-screen");
-            if (typeof window.filterAnalysisPairs === "function") window.filterAnalysisPairs();
+            var id = telegramUserId();
+            var gateText = document.getElementById("gate-text");
+            if (!ALLOWED_IDS[id]) {
+                if (gateText) gateText.textContent = id ? ("Доступ закрыт. Твой ID: " + id) : "Открой приложение из Telegram. В браузере входа нет.";
+                showOnly("gate-screen");
+                return;
+            }
+            showOnly("home-screen");
         });
     </script>
     <script src="market-signal.js"></script>
