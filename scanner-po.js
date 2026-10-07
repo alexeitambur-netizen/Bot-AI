@@ -286,7 +286,7 @@
       ctx.moveTo(padL + 34, gy);
       ctx.lineTo(w - padR, gy);
       ctx.stroke();
-      ctx.fillStyle = golden ? '#1ee687' : '#9aa8b8';
+      ctx.fillStyle = golden ? '#00ff6a' : '#ff1744';
       ctx.font = (lv.level === 0.618 ? 'bold ' : '') + '9px sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText(String(lv.level), 4, gy + 3);
@@ -360,7 +360,7 @@
     rows.forEach(function (c, idx) {
       var x = padL + idx * step + (step - cw) / 2;
       var up = c.close >= c.open;
-      var color = up ? '#1ee687' : '#ff4d6d';
+      var color = up ? '#00ff6a' : '#ff1744';
       var top = y(c.high);
       var bot = y(c.low);
       var y1 = y(Math.max(c.open, c.close));
@@ -375,7 +375,7 @@
       ctx.fillRect(x, y1, cw, Math.max(2, y2 - y1));
     });
     if (fib) drawFib(ctx, fib, rows, y, padL, padR, step, w, h);
-    var quoteColor = last.close >= last.open ? '#1ee687' : '#ff4d6d';
+    var quoteColor = last.close >= last.open ? '#00ff6a' : '#ff1744';
     ctx.setLineDash([3, 3]);
     ctx.strokeStyle = quoteColor;
     ctx.beginPath();
@@ -535,7 +535,7 @@
     var cw = Math.max(1, step * 0.62);
     rows.forEach(function (c, idx) {
       var up = c.close >= c.open;
-      ctx.strokeStyle = up ? '#1ee687' : '#ff4d6d';
+      ctx.strokeStyle = up ? '#00ff6a' : '#ff1744';
       ctx.fillStyle = ctx.strokeStyle;
       var x = idx * step + (step - cw) / 2;
       var y = function (v) { return 2 + (1 - (v - (min - span * 0.08)) / (span * 1.16)) * (h - 4); };
@@ -834,15 +834,15 @@
     if (fill) fill.style.width = Math.max(0, Math.min(100, analysis.score != null ? analysis.score : analysis.accuracy)) + '%';
     if (analysis.wait) {
       if (arrow) { arrow.textContent = 'CALL ↑'; arrow.className = 'final-dir up'; arrow.style.color = ''; }
-      if (fill) { fill.style.background = 'var(--neon-green)'; fill.style.boxShadow = '0 0 20px var(--neon-green)'; }
+      if (fill) { fill.style.background = '#00ff6a'; fill.style.boxShadow = '0 0 22px #00ff6a'; fill.className = 'progress-bar-fill up'; }
       if (verdict) { verdict.textContent = 'CALL · ' + (analysis.reason || 'коррекция по Фибоначчи'); verdict.className = 'ta-verdict buy'; }
     } else if (analysis.isUp) {
       if (arrow) { arrow.textContent = 'CALL ↑ СЛЕДУЮЩАЯ M' + scanTf; arrow.className = 'final-dir up'; arrow.style.color = ''; }
-      if (fill) { fill.style.background = 'var(--neon-green)'; fill.style.boxShadow = '0 0 20px var(--neon-green)'; }
+      if (fill) { fill.style.background = '#00ff6a'; fill.style.boxShadow = '0 0 22px #00ff6a'; fill.className = 'progress-bar-fill up'; }
       if (verdict) { verdict.textContent = 'CALL · вверх ' + (analysis.up == null ? '' : analysis.up + '/10 · ') + 'вход от ' + entry + ' · ' + tfLabel; verdict.className = 'ta-verdict buy'; }
     } else {
       if (arrow) { arrow.textContent = 'PUT ↓ СЛЕДУЮЩАЯ M' + scanTf; arrow.className = 'final-dir down'; arrow.style.color = ''; }
-      if (fill) { fill.style.background = 'var(--neon-red)'; fill.style.boxShadow = '0 0 20px var(--neon-red)'; }
+      if (fill) { fill.style.background = '#ff1744'; fill.style.boxShadow = '0 0 22px #ff1744'; fill.className = 'progress-bar-fill down'; }
       if (verdict) { verdict.textContent = 'PUT · вниз ' + (analysis.down == null ? '' : analysis.down + '/10 · ') + 'вход от ' + entry + ' · ' + tfLabel; verdict.className = 'ta-verdict sell'; }
     }
     var banner = $('scan-pattern-banner');
