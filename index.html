@@ -959,10 +959,11 @@
             width: 100%; padding: 18px 16px; font-size: 16px; font-weight: 900; letter-spacing: .3px;
             background: #f4f7fb !important; color: #10131a !important; border: 0 !important;
         }
-        #tf-1, #cat-forex {
+        .tf-btn.is-on, .cat-btn.is-on, #tf-selector .is-on, [id^="cat-"].is-on {
             background: #f4f7fb !important;
             color: #10131a !important;
             border: 0 !important;
+            box-shadow: 0 0 0 1px #f4f7fb, 0 8px 24px rgba(244, 247, 251, 0.16) !important;
         }
         .search-input {
             background: #0d1018 !important;
@@ -1005,7 +1006,7 @@
                     ⏱ ТАЙМФРЕЙМ СКАНИРОВАНИЯ
                 </div>
                 <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:center;" id="tf-selector">
-                    <button onclick="setScanTimeframe(1)" class="back-btn tf-btn" id="tf-1" style="padding:10px 8px; font-size:13px; flex:1; min-width:48px; max-width:70px; background:var(--neon-green); color:#000; border:none; font-weight:900; border-radius:18px;">1м</button>
+                    <button onclick="setScanTimeframe(1)" class="back-btn tf-btn is-on" id="tf-1" style="padding:10px 8px; font-size:13px; flex:1; min-width:48px; max-width:70px; background:var(--neon-green); color:#000; border:none; font-weight:900; border-radius:18px;">1м</button>
                     <button onclick="setScanTimeframe(2)" class="back-btn tf-btn" id="tf-2" style="padding:10px 8px; font-size:13px; flex:1; min-width:48px; max-width:70px; font-weight:900; border-radius:18px;">2м</button>
                     <button onclick="setScanTimeframe(3)" class="back-btn tf-btn" id="tf-3" style="padding:10px 8px; font-size:13px; flex:1; min-width:48px; max-width:70px; font-weight:900; border-radius:18px;">3м</button>
                     <button onclick="setScanTimeframe(5)" class="back-btn tf-btn" id="tf-5" style="padding:10px 8px; font-size:13px; flex:1; min-width:48px; max-width:70px; font-weight:900; border-radius:18px;">5м</button>
@@ -1019,11 +1020,11 @@
 
             <!-- Категории активов (строго по разделам — без кнопки "ВСЕ") -->
             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; justify-content:center;">
-                <button onclick="setAssetCategory('forex')" class="back-btn" id="cat-forex" style="padding:8px 14px; font-size:11px; flex:1; max-width:85px; background:var(--neon-green); color:#000; border:none;">ВАЛЮТЫ</button>
-                <button onclick="setAssetCategory('crypto')" class="back-btn" id="cat-crypto" style="padding:8px 14px; font-size:11px; flex:1; max-width:95px;">КРИПТА</button>
-                <button onclick="setAssetCategory('commodities')" class="back-btn" id="cat-commodities" style="padding:8px 14px; font-size:11px; flex:1; max-width:95px;">СЫРЬЁ</button>
-                <button onclick="setAssetCategory('stocks')" class="back-btn" id="cat-stocks" style="padding:8px 14px; font-size:11px; flex:1; max-width:80px;">АКЦИИ</button>
-                <button onclick="setAssetCategory('indices')" class="back-btn" id="cat-indices" style="padding:8px 14px; font-size:11px; flex:1; max-width:85px;">ИНДЕКСЫ</button>
+                <button onclick="setAssetCategory('forex')" class="back-btn cat-btn is-on" id="cat-forex" style="padding:8px 14px; font-size:11px; flex:1; max-width:85px; background:var(--neon-green); color:#000; border:none;">ВАЛЮТЫ</button>
+                <button onclick="setAssetCategory('crypto')" class="back-btn cat-btn" id="cat-crypto" style="padding:8px 14px; font-size:11px; flex:1; max-width:95px;">КРИПТА</button>
+                <button onclick="setAssetCategory('commodities')" class="back-btn cat-btn" id="cat-commodities" style="padding:8px 14px; font-size:11px; flex:1; max-width:95px;">СЫРЬЁ</button>
+                <button onclick="setAssetCategory('stocks')" class="back-btn cat-btn" id="cat-stocks" style="padding:8px 14px; font-size:11px; flex:1; max-width:80px;">АКЦИИ</button>
+                <button onclick="setAssetCategory('indices')" class="back-btn cat-btn" id="cat-indices" style="padding:8px 14px; font-size:11px; flex:1; max-width:85px;">ИНДЕКСЫ</button>
             </div>
 
             <div class="search-box">
@@ -1195,19 +1196,9 @@
 
         function setScanTimeframe(mins) {
             currentScanTimeframe = mins;
-            document.querySelectorAll(".tf-btn").forEach(function (btn) {
-                btn.style.background = "rgba(255,255,255,0.06)";
-                btn.style.color = "#fff";
-                btn.style.border = "1px solid rgba(255,255,255,0.12)";
-                btn.style.boxShadow = "none";
-            });
+            document.querySelectorAll(".tf-btn").forEach(function (btn) { btn.classList.remove("is-on"); });
             var activeTf = document.getElementById("tf-" + mins);
-            if (activeTf) {
-                activeTf.style.background = "var(--neon-green)";
-                activeTf.style.color = "#000";
-                activeTf.style.border = "none";
-                activeTf.style.boxShadow = "0 0 14px rgba(0,255,170,0.45)";
-            }
+            if (activeTf) activeTf.classList.add("is-on");
             var hint = document.getElementById("tf-hint");
             if (hint) {
                 var labels = {1:"1-минутном", 2:"2-минутном", 3:"3-минутном", 5:"5-минутном", 10:"10-минутном", 15:"15-минутном"};
@@ -1218,15 +1209,9 @@
 
         function setAssetCategory(category) {
             currentAssetCategory = category;
-            document.querySelectorAll("[id^='cat-']").forEach(function (btn) {
-                btn.style.background = "rgba(255,255,255,0.05)";
-                btn.style.color = "#fff";
-            });
+            document.querySelectorAll("[id^='cat-']").forEach(function (btn) { btn.classList.remove("is-on"); });
             var activeBtn = document.getElementById("cat-" + category);
-            if (activeBtn) {
-                activeBtn.style.background = "var(--neon-green)";
-                activeBtn.style.color = "#000";
-            }
+            if (activeBtn) activeBtn.classList.add("is-on");
             var searchInput = document.getElementById("analysis-search-input");
             if (searchInput) searchInput.value = "";
             if (PAIR_CACHE) paintPairs(PAIR_CACHE);
@@ -1266,6 +1251,8 @@
                 return;
             }
             showOnly("home-screen");
+            setScanTimeframe(1);
+            setAssetCategory("forex");
         });
     </script>
     <script src="market-signal.js"></script>
