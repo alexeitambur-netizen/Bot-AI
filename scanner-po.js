@@ -209,6 +209,7 @@
     var agg = window.SignalEngine.aggregate;
     var input = {
       pair: pairName,
+      tf: span,
       m1: closed,
       now: Date.now(),
       lastTickAt: quoteFresh(rows, span) ? Date.now() : (closed.length ? barOpen(closed[closed.length - 1]) + ms : 0)

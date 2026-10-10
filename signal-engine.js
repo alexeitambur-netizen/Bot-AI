@@ -272,6 +272,29 @@
     return (slice[slice.length - 1].close - lo) / span;
   }
 
+  function barSide(bar) {
+    if (!bar || !(bar.close > 0) || !(bar.open > 0)) return null;
+    if (bar.close > bar.open) return 'UP';
+    if (bar.close < bar.open) return 'DOWN';
+    return null;
+  }
+
+  // Next bar is not in the packet. It opens at the previous close.
+  // Call it only from a new closed body. A color already printed again is skipped,
+  // so a lagging average cannot keep the same side for several bars.
+  function nextCandleRead(rows) {
+    if (!rows || rows.length < 2) return null;
+    var last = rows[rows.length - 1];
+    var prev = rows[rows.length - 2];
+    var side = barSide(last);
+    var prevSide = barSide(prev);
+    if (!side || !prevSide || side === prevSide) return null;
+    var range = Math.max(last.high - last.low, 0);
+    var body = Math.abs(last.close - last.open);
+    if (!(range > 0) || body / range < 0.35) return null;
+    return side;
+  }
+
   function decide(input) {
     input = input || {};
     var cfg = settingsFor(input.pair);
@@ -283,7 +306,7 @@
     function none(reason) {
       return card('NO_TRADE', 0, 0, 'UNCERTAIN', reason, dataAge, input, {});
     }
-    if (m1.length < 60) return none('Мало закрытых минутных свечей.');
+    if (m1.length < 60) return none('Мало закрытых свечей этого таймфрейма.');
     if (now && newest && dataAge > cfg.maxDataAgeMs) return none('Котировка устарела: ' + dataAge + ' мс.');
 
     var values = closesOf(m1);
@@ -468,13 +491,18 @@
     };
 
     input._parts = { trend: trend, momentum: momentum, action: action, levels: levels, mtf: mtf, tradable: tradable };
-    var shift = socketShift(input.ticks, now);
-    if (shift && (!now || dataAge <= cfg.maxDataAgeMs)) {
-      var shiftScore = direction === shift.side ? Math.max(score, 64) : 64;
-      input._parts = { trend: trend, momentum: momentum, action: action, levels: levels, mtf: mtf, tradable: tradable, shift: shift.side };
-      return card(shift.side, shift.side === 'UP' ? shiftScore : upScore, shift.side === 'DOWN' ? shiftScore : downScore, state, 'Сдвиг последних тиков сокета ' + (shift.side === 'UP' ? 'вверх' : 'вниз') + '. Следующая минута в сторону этого сдвига.', dataAge, input, snapshot, null, shiftScore);
+    var read = nextCandleRead(m1);
+    if (tradable < 40) {
+      blocks = [state === 'LOW_VOLATILITY' ? 'Слишком тихий рынок.' : 'Слишком рваный рынок.'];
+    } else if (!read) {
+      blocks = ['Следующая свеча этого таймфрейма не берётся: нет новой закрытой свечи с телом.'];
+    } else {
+      direction = read;
+      blocks = [];
+      if (read === 'UP') upScore = Math.max(upScore, 60);
+      else downScore = Math.max(downScore, 60);
+      score = Math.max(upScore, downScore);
     }
-    input._parts = { trend: trend, momentum: momentum, action: action, levels: levels, mtf: mtf, tradable: tradable };
     if (blocks.length) return card('NO_TRADE', upScore, downScore, state, blocks.join(' '), dataAge, input, snapshot);
     var confirmed = {
       trend: (direction === 'UP' ? trend.up : trend.down) >= 55,
@@ -483,18 +511,20 @@
       priceAction: (direction === 'UP' ? action.up : action.down) >= 40,
       mtf: side5 === direction || side3 === direction
     };
-    return card(direction, upScore, downScore, state, 'Независимые подтверждения сошлись.', dataAge, input, snapshot, confirmed, score);
+    var sideWord = direction === 'UP' ? 'вверх' : 'вниз';
+    return card(direction, upScore, downScore, state, 'Новая закрытая свеча ' + sideWord + '. Сигнал на следующую свечу этого таймфрейма.', dataAge, input, snapshot, confirmed, score);
   }
 
   function card(direction, upScore, downScore, state, reason, dataAge, input, snapshot, confirmed, score) {
     var strength = direction === 'NO_TRADE' ? Math.max(upScore, downScore) : (score || Math.max(upScore, downScore));
     var label = strength >= 90 ? 'VERY STRONG' : (strength >= 80 ? 'STRONG' : (strength >= 70 ? 'MODERATE' : (strength >= 60 ? 'WEAK' : 'NO TRADE')));
     if (direction === 'NO_TRADE') label = 'NO TRADE';
+    var tfMin = Math.max(1, Number(input.tf) || 1);
     var lines = [
       'PAIR: ' + (input.pair || ''),
-      'TIMEFRAME: 1 MIN',
+      'TIMEFRAME: ' + tfMin + ' MIN',
       'SIGNAL: ' + (direction === 'UP' ? 'CALL / UP' : (direction === 'DOWN' ? 'PUT / DOWN' : 'NO TRADE')),
-      'EXPIRATION: 60 SEC',
+      'EXPIRATION: ' + (tfMin * 60) + ' SEC',
       'SIGNAL SCORE: ' + strength + '/100 ' + label,
       'MARKET STATE: ' + state,
       'REASON: ' + reason,

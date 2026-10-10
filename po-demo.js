@@ -55,7 +55,7 @@ function asCandles(rows) {
   }).sort(function (a, b) { return a.time - b.time; });
 }
 
-function asTicks(history) {
+function historyTicks(history) {
   return (history || []).map(function (row) {
     if (!Array.isArray(row) || row.length < 2) return null;
     var time = Number(row[0]);
@@ -65,8 +65,56 @@ function asTicks(history) {
       price = Number(row[2]);
     }
     if (!(price > 0) || !isFinite(time)) return null;
-    return { t: time < 10000000000 ? time * 1000 : time, price: price };
-  }).filter(Boolean).sort(function (a, b) { return a.t - b.t; }).slice(-120);
+    var sec = time < 10000000000 ? time : time / 1000;
+    return { t: sec * 1000, sec: sec, price: price };
+  }).filter(Boolean).sort(function (a, b) { return a.sec - b.sec; });
+}
+
+function asTicks(history) {
+  return historyTicks(history).map(function (tick) {
+    return { t: tick.t, price: tick.price };
+  }).slice(-120);
+}
+
+function barSec(bar) {
+  var raw = Number(bar && (bar.time != null ? bar.time : bar.t));
+  return raw > 10000000000 ? raw / 1000 : raw;
+}
+
+// Pocket Option history candles stop a few minutes early. The same packet's
+// history ticks are what the terminal uses to draw those missing minutes:
+// bucket = floor(tickTime / period), open = first price, close = last price.
+function stitchCandles(candles, history, periodSec) {
+  var bars = (candles || []).slice();
+  var ticks = historyTicks(history);
+  var period = Math.max(1, Number(periodSec) || 60);
+  if (!bars.length || !ticks.length) return bars;
+  var by = {};
+  bars.forEach(function (bar) { by[Math.floor(barSec(bar))] = bar; });
+  var serverLast = Math.floor(barSec(bars[bars.length - 1]));
+  ticks.forEach(function (tick) {
+    var bucket = Math.floor(tick.sec / period) * period;
+    if (bucket < serverLast) return;
+    var bar = by[bucket];
+    if (!bar) {
+      bar = {
+        t: bucket * 1000,
+        time: bucket,
+        open: tick.price,
+        high: tick.price,
+        low: tick.price,
+        close: tick.price
+      };
+      by[bucket] = bar;
+      bars.push(bar);
+      return;
+    }
+    bar.high = Math.max(bar.high, tick.price);
+    bar.low = Math.min(bar.low, tick.price);
+    bar.close = tick.price;
+  });
+  bars.sort(function (a, b) { return barSec(a) - barSec(b); });
+  return bars;
 }
 
 function candlesFromTicks(ticks, periodSec) {
@@ -91,22 +139,6 @@ function candlesFromTicks(ticks, periodSec) {
     bar.close = tick.price;
   });
   return Array.from(buckets.values()).sort(function (a, b) { return a.time - b.time; });
-}
-
-function applyLiveTick(candles, history) {
-  if (!candles.length || !history || !history.length) return candles.length ? candles[candles.length - 1].close : null;
-  var tick = history.slice().sort(function (a, b) { return Number(a[0]) - Number(b[0]); }).pop();
-  var price = Number(tick[1]);
-  var tickSec = Number(tick[0]);
-  if (!(price > 0)) return candles[candles.length - 1].close;
-  var bar = candles[candles.length - 1];
-  var barSec = bar.time > 10000000000 ? bar.time / 1000 : bar.time;
-  if (tickSec + 1 >= barSec) {
-    bar.close = price;
-    bar.high = Math.max(bar.high, price);
-    bar.low = Math.min(bar.low, price);
-  }
-  return price;
 }
 
 class DemoFeed {
@@ -307,7 +339,7 @@ class DemoFeed {
         const sec = ts > 10000000000 ? ts / 1000 : ts;
         const bucket = Math.floor(sec / pack.period) * pack.period;
         const last = pack.candles[pack.candles.length - 1];
-        const lastSec = last.time > 10000000000 ? last.time / 1000 : last.time;
+        const lastSec = barSec(last);
         if (bucket > lastSec + 1) {
           pack.candles.push({
             t: bucket * 1000,
@@ -318,7 +350,7 @@ class DemoFeed {
             close: price
           });
           if (pack.candles.length > 400) pack.candles.splice(0, pack.candles.length - 400);
-        } else {
+        } else if (bucket >= lastSec) {
           last.close = price;
           last.high = Math.max(last.high, price);
           last.low = Math.min(last.low, price);
@@ -338,16 +370,15 @@ class DemoFeed {
     const job = this.pending;
     this.pending = null;
     clearTimeout(this.timer);
-    let candles = asCandles(data.candles).slice(-400);
+    let candles = stitchCandles(asCandles(data.candles), data.history, job.period).slice(-400);
     const ticks = asTicks(data.history);
     if (candles.length < 8 && ticks.length) candles = candlesFromTicks(ticks, job.period).slice(-400);
-    const last = applyLiveTick(candles, data.history);
     const quoteAt = ticks.length ? ticks[ticks.length - 1].t : (candles.length ? Number(candles[candles.length - 1].t) : Date.now());
     const pack = {
       symbol: data.asset || job.symbol,
       requested: job.pair,
       period: Number(data.period || job.period),
-      last: last,
+      last: candles.length ? candles[candles.length - 1].close : null,
       candles: candles,
       ticks: ticks,
       quoteAt: quoteAt,
@@ -418,4 +449,4 @@ function health() {
   };
 }
 
-module.exports = { candles, payouts, toSymbol, health };
+module.exports = { candles, payouts, toSymbol, health, stitchCandles };
