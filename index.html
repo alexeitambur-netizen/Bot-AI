@@ -1100,6 +1100,7 @@
         window.SERVER_URL = location.origin;
         var PAIR_CACHE = null;
         function paintPairs(data) {
+            if (window.__SLV_LIVE_PAIRS__) return;
             var box = document.getElementById("analysis-pairs-render-box");
             var countEl = document.getElementById("total-assets-count");
             if (!box || !data || !data.categories) return;
@@ -1163,8 +1164,8 @@
         function openScanner() {
             if (!ALLOWED_IDS[telegramUserId()]) return showOnly("gate-screen");
             showOnly("bot-analysis-screen");
-            loadPairs();
-            if (typeof window.filterAnalysisPairs === "function") window.filterAnalysisPairs();
+            if (typeof window.startPairBoard === "function") window.startPairBoard();
+            else loadPairs();
         }
         window.openScanner = openScanner;
         try {
@@ -1203,7 +1204,7 @@
             if (activeBtn) activeBtn.classList.add("is-on");
             var searchInput = document.getElementById("analysis-search-input");
             if (searchInput) searchInput.value = "";
-            if (PAIR_CACHE) paintPairs(PAIR_CACHE);
+            if (PAIR_CACHE && !window.__SLV_LIVE_PAIRS__) paintPairs(PAIR_CACHE);
             if (typeof window.filterAnalysisPairs === "function") window.filterAnalysisPairs();
         }
         window.setAssetCategory = setAssetCategory;

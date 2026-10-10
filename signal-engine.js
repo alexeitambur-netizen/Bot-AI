@@ -5,8 +5,8 @@
   if (root) root.SignalEngine = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   var SETTINGS = {
-    minScore: 70,
-    minGap: 12,
+    minScore: 60,
+    minGap: 8,
     maxDataAgeMs: 90000,
     weights: { trend: 25, momentum: 20, volatility: 10, priceAction: 20, levels: 10, mtf: 15 },
     pairs: {}
@@ -431,7 +431,6 @@
     var gap = Math.abs(upScore - downScore);
     var blocks = [];
     if (tradable < 40) blocks.push(state === 'LOW_VOLATILITY' ? 'Слишком тихий рынок.' : 'Слишком рваный рынок.');
-    if (state === 'UNCERTAIN') blocks.push('Состояние рынка неясно.');
     if (state === 'TREND_UP' && direction === 'DOWN') blocks.push('Минутный счёт против восходящего контекста.');
     if (state === 'TREND_DOWN' && direction === 'UP') blocks.push('Минутный счёт против нисходящего контекста.');
     if (state === 'RANGE' && pos > 0.25 && pos < 0.75) blocks.push('Флэт в середине диапазона.');

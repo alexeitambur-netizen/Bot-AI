@@ -11,10 +11,62 @@
 
   function $(id) { return document.getElementById(id); }
 
+  var GATEWAY = 'https://vip-community.onrender.com';
+
   function apiBase() {
-    if (location.origin && location.origin.indexOf('http') === 0 && location.hostname !== 'github.com') return location.origin;
-    if (window.SERVER_URL) return String(window.SERVER_URL).replace(/\/$/, '');
-    return PO_API;
+    if (window.__PO_API__) return String(window.__PO_API__).replace(/\/$/, '');
+    if (window.SERVER_URL && /^https?:\/\//.test(String(window.SERVER_URL))) return String(window.SERVER_URL).replace(/\/$/, '');
+    if (typeof location !== 'undefined' && location.origin && location.origin.indexOf('http') === 0 && location.hostname !== 'github.com') return location.origin;
+    return GATEWAY;
+  }
+
+  function apiBases() {
+    var bases = [];
+    function add(base) {
+      base = String(base || '').replace(/\/$/, '');
+      if (!base || bases.indexOf(base) !== -1) return;
+      bases.push(base);
+    }
+    if (window.__PO_API__) add(window.__PO_API__);
+    else {
+      add(apiBase());
+      add(GATEWAY);
+    }
+    return bases;
+  }
+
+  function raceJson(path, bases) {
+    return new Promise(function (resolve, reject) {
+      var left = bases.length;
+      var failed = 0;
+      var done = false;
+      if (!left) return reject(new Error('нет шлюза'));
+      bases.forEach(function (base) {
+        fetch(base + path, { cache: 'no-store' }).then(function (res) {
+          if (!res.ok) throw new Error(path + ' ' + res.status);
+          return res.json();
+        }).then(function (data) {
+          if (done) return;
+          done = true;
+          window.__PO_API__ = base;
+          window.SERVER_URL = base;
+          resolve(data);
+        }).catch(function () {
+          failed += 1;
+          if (!done && failed === left) reject(new Error('нет шлюза'));
+        });
+      });
+    });
+  }
+
+  async function fetchJson(path) {
+    try {
+      return await raceJson(path, apiBases());
+    } catch (e) {
+      if (!window.__PO_API__) throw e;
+      window.__PO_API__ = '';
+      return raceJson(path, apiBases());
+    }
   }
 
   function norm(name) {
@@ -458,9 +510,7 @@
     var ids = ['forex', 'crypto', 'commodities', 'stocks', 'indices'];
     for (var i = 0; i < ids.length; i++) {
       var btn = $('cat-' + ids[i]);
-      if (!btn) continue;
-      var bg = String(btn.style.background || '');
-      if (bg.indexOf('neon-green') !== -1) return ids[i];
+      if (btn && btn.classList.contains('is-on')) return ids[i];
     }
     return scanCategory || 'forex';
   }
@@ -530,8 +580,10 @@
     if (!pair || pair.active === false) return '';
     var hit = pairSignals[norm(pair.display)];
     if (!hit || (hit.signal !== 'UP' && hit.signal !== 'DOWN')) return '';
-    var color = hit.signal === 'UP' ? '#00ff6a' : '#ff1744';
-    return '<span style="color:' + color + ';font-size:13px;font-weight:900;letter-spacing:.8px;">СИГНАЛ</span>';
+    var up = hit.signal === 'UP';
+    var color = up ? '#00ff6a' : '#ff1744';
+    var bg = up ? 'rgba(0,255,106,.16)' : 'rgba(255,23,68,.16)';
+    return '<span style="color:' + color + ';background:' + bg + ';font-size:12px;font-weight:900;letter-spacing:.4px;border-radius:999px;padding:4px 8px;white-space:nowrap;">СИГНАЛ · ' + (up ? 'CALL' : 'PUT') + '</span>';
   }
 
   function metaChips(pair) {
@@ -707,7 +759,7 @@
         paintBoard(title + ': ' + stats.done + ' из ' + list.length + '. На эту минуту CALL ' + stats.call + ', PUT ' + stats.put + ', нет сделки ' + stats.wait + '. На этих же закрытых минутах: плюс ' + stats.wins + ', минус ' + stats.losses + ', пропуск ' + stats.skip + '. Плюс и минус — проверка прошлых минут, не обещание следующей.');
       }
     }
-    await Promise.all([worker(), worker()]);
+    await Promise.all([worker(), worker(), worker(), worker()]);
     if (gen === boardRun.gen) boardRun.running = false;
   }
 
@@ -765,9 +817,7 @@
   async function refreshPocketPairs() {
     setPoStatus('POCKET OPTION • загрузка пар…');
     try {
-      var res = await fetch(apiBase() + '/api/payouts', { cache: 'no-store' });
-      if (!res.ok) throw new Error('payouts ' + res.status);
-      var data = await res.json();
+      var data = await fetchJson('/api/payouts');
       if (!absorbPayouts(data)) throw new Error('empty payouts');
       var source = (data && data.source) || 'pocketoption';
       setPoStatus(source.indexOf('demo') >= 0 || source.indexOf('pocket') >= 0 ? 'POCKET OPTION • выплаты как в терминале' : 'POCKET OPTION • доска выплат');
@@ -781,8 +831,7 @@
   async function pocketConnected() {
     if (poLink && Date.now() - poLink.at < 15000) return poLink.ok;
     try {
-      var res = await fetch(apiBase() + '/api/po/health', { cache: 'no-store' });
-      var data = await res.json();
+      var data = await fetchJson('/api/po/health');
       poLink = { at: Date.now(), ok: !!(data && data.connected) };
     } catch (e) {
       poLink = { at: Date.now(), ok: false };
@@ -793,9 +842,7 @@
   async function fetchPocketCandles(pairName, tf, periodSeconds) {
     var period = periodSeconds || Math.max(60, Number(tf || 1) * 60);
     var pocketLive = await pocketConnected();
-    var res = await fetch(apiBase() + '/api/candles?pair=' + encodeURIComponent(pairName) + '&period=' + period, { cache: 'no-store' });
-    if (!res.ok) throw new Error('candles ' + res.status);
-    var data = await res.json();
+    var data = await fetchJson('/api/candles?pair=' + encodeURIComponent(pairName) + '&period=' + period);
     var rows = (data && data.candles) || [];
     if (!rows.length) throw new Error('empty');
     return {
@@ -1246,11 +1293,18 @@
   }
 
   function boot() {
-    if (wire()) return;
+    window.startPairBoard = function () { refreshPocketPairs(); };
+    if (wire()) {
+      refreshPocketPairs();
+      return;
+    }
     var tries = 0;
     var timer = setInterval(function () {
       tries += 1;
-      if (wire() || tries > 40) clearInterval(timer);
+      if (wire() || tries > 40) {
+        clearInterval(timer);
+        if (wired) refreshPocketPairs();
+      }
     }, 50);
   }
 
