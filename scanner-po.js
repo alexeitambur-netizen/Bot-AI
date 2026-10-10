@@ -179,14 +179,49 @@
     return window.VipMarket.fibRetracement(rows);
   }
 
-  function settledBars(rows) {
-    if (!rows || rows.length < 3) return rows || [];
-    var last = rows[rows.length - 1];
-    var start = Number(last.t || last.time || 0);
+  function barOpen(row) {
+    var start = Number(row && (row.t || row.time) || 0);
     if (start > 0 && start < 1000000000000) start *= 1000;
-    var minuteStart = Math.floor(Date.now() / 60000) * 60000;
-    if (start >= minuteStart) return rows.slice(0, -1);
-    return rows;
+    return start;
+  }
+
+  function closedBars(rows, tf) {
+    var list = rows || [];
+    if (list.length < 2) return list.slice();
+    var ms = Math.max(1, Number(tf) || 1) * 60000;
+    var bucket = Math.floor(Date.now() / ms) * ms;
+    if (barOpen(list[list.length - 1]) >= bucket) return list.slice(0, -1);
+    return list.slice();
+  }
+
+  function quoteFresh(rows, tf) {
+    if (!rows || !rows.length) return false;
+    var ms = Math.max(1, Number(tf) || 1) * 60000;
+    var bucket = Math.floor(Date.now() / ms) * ms;
+    return barOpen(rows[rows.length - 1]) >= bucket - ms;
+  }
+
+  function decideSeries(rows, tf, pairName) {
+    if (!window.SignalEngine || !window.SignalEngine.decide) return null;
+    var span = Math.max(1, Number(tf) || 1);
+    var ms = span * 60000;
+    var closed = closedBars(rows, span);
+    var agg = window.SignalEngine.aggregate;
+    var input = {
+      pair: pairName,
+      m1: closed,
+      now: Date.now(),
+      lastTickAt: quoteFresh(rows, span) ? Date.now() : (closed.length ? barOpen(closed[closed.length - 1]) + ms : 0)
+    };
+    if (span > 1 && agg) {
+      input.m5 = agg(closed, ms * 3);
+      input.m15 = agg(closed, ms * 5);
+    }
+    return window.SignalEngine.decide(input);
+  }
+
+  function settledBars(rows, tf) {
+    return closedBars(rows, tf || scanTf || 1);
   }
 
   function minuteCall(fib, rows, ticks) {
@@ -260,28 +295,10 @@
     score += pattern.bias;
     if (lastClosed.close <= levels.support + range * 0.16 && pattern.bias >= 0) score += 2;
     if (lastClosed.close >= levels.resistance - range * 0.16 && pattern.bias <= 0) score -= 2;
-    var settled = settledBars(series);
+    var tfNow = (meta && meta.tf) || scanTf || 1;
+    var settled = settledBars(series, tfNow);
     var fib = fibRetracement(settled.slice(-160));
-    var higherRows = higher ? settledBars(sanitizeCandles(higher).slice(-400)) : null;
-    var board = null;
-    if (window.SignalEngine && window.SignalEngine.decide) {
-      var agg = window.SignalEngine.aggregate;
-      var tickAt = 0;
-      (ticks || []).forEach(function (tick) {
-        var stamp = Number(tick && (tick.t || tick[0]) || 0);
-        if (stamp > 0 && stamp < 1000000000000) stamp *= 1000;
-        if (stamp > tickAt) tickAt = stamp;
-      });
-      board = window.SignalEngine.decide({
-        pair: frames && frames.pair,
-        m1: settled,
-        m3: agg ? agg(settled, 180000) : [],
-        m5: (frames && frames['5м']) || higherRows || [],
-        m15: (frames && frames['15м']) || [],
-        now: Date.now(),
-        lastTickAt: (meta && meta.quoteAt) || tickAt || (settled.length ? settled[settled.length - 1].t : 0)
-      });
-    }
+    var board = decideSeries(series, tfNow, frames && frames.pair);
     var wait = board ? !!board.wait : true;
     var isUp = board ? !!board.isUp : false;
     var accuracy = board ? board.score : 0;
@@ -533,7 +550,8 @@
 
   var pairSignals = {};
   var pinClock = 0;
-  var boardRun = { cat: '', minute: 0, gen: 0 };
+  var boardRun = { cat: '', minute: 0, gen: 0, tf: 0, running: false, armed: false };
+  var boardTimer = null;
 
   function esc(text) {
     return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -646,7 +664,6 @@
     }
     var countEl = $('total-assets-count');
     if (countEl) countEl.textContent = String(liveTotal);
-    scheduleBoard();
     return true;
   }
 
@@ -699,59 +716,88 @@
     box.scrollTop = 0;
   }
 
-  function scheduleBoard() {
+  function layoutSignals() {
     var cat = activeCategory();
-    var minute = Math.floor(Date.now() / 60000);
-    if (boardRun.cat === cat && boardRun.minute === minute) return;
-    boardRun.cat = cat;
-    boardRun.minute = minute;
-    boardRun.running = true;
-    var gen = ++boardRun.gen;
-    runBoard(cat, gen);
+    restorePayoutOrder(cat);
+    var box = $('analysis-pairs-render-box');
+    if (!box) return;
+    var rows = Array.prototype.slice.call(box.querySelectorAll('.pair-row'));
+    rows.sort(function (a, b) {
+      return entryPin(pairByName(b.getAttribute('data-pair'))) - entryPin(pairByName(a.getAttribute('data-pair')));
+    });
+    rows.forEach(function (row) { box.appendChild(row); });
   }
 
-  async function runBoard(cat, gen) {
+  function armRescan() {
+    if (boardTimer) clearTimeout(boardTimer);
+    boardTimer = setTimeout(function () {
+      boardTimer = null;
+      kickBoard(false);
+    }, 30000);
+  }
+
+  function finishBoard(gen) {
+    if (gen !== boardRun.gen) return;
+    boardRun.running = false;
+    layoutSignals();
+    armRescan();
+  }
+
+  function kickBoard(force) {
+    var cat = activeCategory();
+    var tf = Number(scanTf) || 1;
+    if (boardRun.running && !force) return;
+    boardRun.cat = cat;
+    boardRun.tf = tf;
+    boardRun.running = true;
+    boardRun.armed = true;
+    var gen = ++boardRun.gen;
+    runBoard(cat, gen, !!force);
+  }
+
+  function scheduleBoard() {
+    kickBoard(false);
+  }
+
+  async function runBoard(cat, gen, resetPins) {
+    var tf = Number(scanTf) || 1;
     if (cat !== 'forex') {
       paintBoard('Сигналы только по валютам с выплатой 92%.');
       refreshBadges();
-      if (gen === boardRun.gen) boardRun.running = false;
+      finishBoard(gen);
       return;
     }
     var list = ((liveCats && liveCats.forex) || []).filter(hotForex);
     var stats = { call: 0, put: 0, wait: 0, wins: 0, losses: 0, pushes: 0, skip: 0, done: 0, bars: 0 };
-    pinClock = 0;
+    if (resetPins) pinClock = 0;
     var allowed = {};
     for (var allowI = 0; allowI < list.length; allowI++) allowed[norm(list[allowI].display)] = 1;
     Object.keys(pairSignals).forEach(function (key) { if (!allowed[key]) delete pairSignals[key]; });
-    for (var resetI = 0; resetI < list.length; resetI++) delete pairSignals[norm(list[resetI].display)];
-    restorePayoutOrder(cat);
-    refreshBadges();
+    if (resetPins) {
+      for (var resetI = 0; resetI < list.length; resetI++) delete pairSignals[norm(list[resetI].display)];
+      restorePayoutOrder(cat);
+      refreshBadges();
+    }
     if (!list.length) {
       paintBoard('Сейчас нет открытых валют с выплатой 92%.');
-      if (gen === boardRun.gen) boardRun.running = false;
+      finishBoard(gen);
       return;
     }
-    paintBoard('Валюты 92%: сканирую ' + list.length + '. Найденный сигнал сразу пишется на строке и встаёт наверх.');
+    paintBoard('M' + tf + ' · валюты 92%: сканирую ' + list.length + '. Сигнал на следующую свечу M' + tf + '. Повтор каждые 30 секунд.');
     var cursor = 0;
     async function worker() {
       while (cursor < list.length && gen === boardRun.gen) {
         var pair = list[cursor++];
         var name = pair.display;
         try {
-          var pack = await fetchPocketCandles(name, 1, 60);
+          var pack = await fetchPocketCandles(name, tf, tf * 60);
           if (gen !== boardRun.gen) return;
-          var rows = settledBars(sanitizeCandles(pack.candles));
+          var rawRows = sanitizeCandles(pack.candles);
+          var rows = closedBars(rawRows, tf);
           var canvas = document.querySelector('canvas.po-row-spark[data-pair="' + name.replace(/"/g, '') + '"]');
           if (canvas) drawSpark(canvas, rows);
-          var lastT = rows.length ? Number(rows[rows.length - 1].t) : 0;
-          if (lastT > 0 && lastT < 1000000000000) lastT *= 1000;
           var fromPocket = isPocketHistory(rows, pack.source);
-          var board = (!fromPocket || !window.SignalEngine) ? null : window.SignalEngine.decide({
-            pair: name,
-            m1: rows,
-            now: Date.now(),
-            lastTickAt: lastT ? lastT + 60000 : 0
-          });
+          var board = fromPocket ? decideSeries(rawRows, tf, name) : null;
           var report = (fromPocket && window.SignalEngine && window.SignalEngine.backtest) ? window.SignalEngine.backtest(rows, name) : null;
           var direction = board ? board.direction : 'NO_TRADE';
           var tradable = direction === 'UP' || direction === 'DOWN';
@@ -778,11 +824,11 @@
         stats.done += 1;
         refreshBadges();
         if (pairSignals[norm(name)] && pairSignals[norm(name)].pin) liftSignalRow(name);
-        paintBoard('Валюты 92%: ' + stats.done + ' из ' + list.length + '. CALL ' + stats.call + ', PUT ' + stats.put + ', без входа ' + stats.wait + '. На прошлых минутах плюс ' + stats.wins + ', минус ' + stats.losses + '.');
+        paintBoard('M' + tf + ' · валюты 92%: ' + stats.done + ' из ' + list.length + '. Следующая свеча M' + tf + ': CALL ' + stats.call + ', PUT ' + stats.put + ', без входа ' + stats.wait + '. Плюс ' + stats.wins + ', минус ' + stats.losses + '.');
       }
     }
     await Promise.all([worker(), worker(), worker(), worker()]);
-    if (gen === boardRun.gen) boardRun.running = false;
+    finishBoard(gen);
   }
 
 
@@ -844,6 +890,7 @@
       var source = (data && data.source) || 'pocketoption';
       setPoStatus(source.indexOf('demo') >= 0 || source.indexOf('pocket') >= 0 ? 'POCKET OPTION • выплаты как в терминале' : 'POCKET OPTION • доска выплат');
       if (typeof window.filterAnalysisPairs === 'function') window.filterAnalysisPairs();
+      if (!boardRun.armed) kickBoard(false);
     } catch (e) {
       setPoStatus('POCKET OPTION • нет связи со шлюзом');
     }
@@ -1217,7 +1264,8 @@
     };
     window.setScanTimeframe = function (mins) {
       scanTf = Number(mins) || 1;
-      if (typeof origSetTf === 'function') return origSetTf.apply(this, arguments);
+      if (typeof origSetTf === 'function') origSetTf.apply(this, arguments);
+      kickBoard(true);
     };
     window.filterAnalysisPairs = function () {
       if (liveCats) return renderLivePairs();
@@ -1268,7 +1316,7 @@
         var loaded = await loadScan(pairName, tf);
         var pack = loaded.pack;
         var fromPocket = isPocketHistory(pack.candles, pack.source);
-        var raw = gateSignal(pairName, analyzeMarket(pack.candles, pack.ticks, loaded.m5, loaded.frames, { quoteAt: pack.quoteAt, receivedAt: pack.receivedAt }));
+        var raw = gateSignal(pairName, analyzeMarket(pack.candles, pack.ticks, loaded.m5, loaded.frames, { quoteAt: pack.quoteAt, receivedAt: pack.receivedAt, tf: tf }));
         var analysis = presentSignal(pairName, tf, raw);
         if (fromPocket) {
           gradeJournal(pack.candles, pack.ticks);
@@ -1292,7 +1340,7 @@
             var freshLoad = await loadScan(pairName, tf);
             var fresh = freshLoad.pack;
             var liveOk = isPocketHistory(fresh.candles, fresh.source);
-            var rawLive = gateSignal(pairName, analyzeMarket(fresh.candles, fresh.ticks, freshLoad.m5, freshLoad.frames, { quoteAt: fresh.quoteAt, receivedAt: fresh.receivedAt }));
+            var rawLive = gateSignal(pairName, analyzeMarket(fresh.candles, fresh.ticks, freshLoad.m5, freshLoad.frames, { quoteAt: fresh.quoteAt, receivedAt: fresh.receivedAt, tf: tf }));
             var live = presentSignal(pairName, tf, rawLive);
             if (liveOk) {
               gradeJournal(fresh.candles, fresh.ticks);
