@@ -465,7 +465,8 @@
           display: display,
           symbol: row.symbol || display,
           payout: Math.round(Number(row.payout || row.percent || 0)),
-          active: row.active !== false
+          active: row.active !== false,
+          bucket: target
         });
       });
     });
@@ -478,7 +479,8 @@
           display: display,
           symbol: row.id || row.symbol || display,
           payout: Math.round(Number(row.payout || 0)),
-          active: row.active !== false
+          active: row.active !== false,
+          bucket: target
         });
       });
     }
@@ -543,8 +545,32 @@
     return null;
   }
 
+  function pairRecord(name) {
+    var keys = ['forex', 'crypto', 'commodities', 'stocks', 'indices'];
+    for (var i = 0; i < keys.length; i++) {
+      var list = (liveCats && liveCats[keys[i]]) || [];
+      for (var j = 0; j < list.length; j++) if (list[j].display === name) return list[j];
+    }
+    return null;
+  }
+
+  function hotForex(pair) {
+    return !!(pair && pair.bucket === 'forex' && pair.active !== false && Number(pair.payout) >= 92);
+  }
+
+  function gateSignal(name, raw) {
+    if (!raw || hotForex(pairRecord(name))) return raw;
+    raw.wait = true;
+    raw.isUp = false;
+    raw.reclaimSide = '';
+    raw.score = 0;
+    raw.accuracy = 0;
+    raw.reason = 'Сигнал только по валютной паре с выплатой 92%.';
+    return raw;
+  }
+
   function entryPin(pair) {
-    if (!pair || pair.active === false) return 0;
+    if (!hotForex(pair)) return 0;
     var hit = pairSignals[norm(pair.display)];
     if (!hit || (hit.signal !== 'UP' && hit.signal !== 'DOWN')) return 0;
     return hit.pin || 0;
@@ -556,7 +582,7 @@
     if (!box || !box.parentElement) return;
     var el = document.createElement('div');
     el.id = 'slv-all-board';
-    el.style.cssText = 'margin:0 0 10px;padding:12px 14px;border-radius:18px;background:rgba(0,0,0,.4);border:1px solid rgba(142,162,255,.35);color:#d5deea;font-size:12px;font-weight:700;line-height:1.45;';
+    el.style.cssText = 'margin:0 0 8px;padding:8px 12px;border-radius:14px;background:rgba(0,0,0,.4);border:1px solid rgba(142,162,255,.35);color:#d5deea;font-size:11px;font-weight:700;line-height:1.35;';
     el.textContent = 'Сканирую все пары этой вкладки на следующую минуту…';
     box.parentElement.insertBefore(el, box);
   }
@@ -568,34 +594,16 @@
   }
 
   function badgeFor(pair) {
-    if (pair.active === false) return '<span style="color:#ff4d6d;font-size:11px;font-weight:900;">ЗАКРЫТА</span>';
-    var hit = pairSignals[norm(pair.display)];
-    if (!hit) return '<span style="color:#8ea2ff;font-size:11px;font-weight:900;">ЖДУ</span>';
-    if (hit.signal === 'UP') return '<span style="color:#00ff6a;font-size:12px;font-weight:900;">CALL ' + hit.score + '</span>';
-    if (hit.signal === 'DOWN') return '<span style="color:#ff1744;font-size:12px;font-weight:900;">PUT ' + hit.score + '</span>';
-    return '<span style="color:#8ea2ff;font-size:11px;font-weight:900;">НЕТ СДЕЛКИ</span>';
+    if (pair.active === false) return '<span style="color:#ff4d6d;font-size:10px;font-weight:800;">ЗАКРЫТА</span>';
+    return '';
   }
 
   function signalMark(pair) {
-    if (!pair || pair.active === false) return '';
+    if (!hotForex(pair)) return '';
     var hit = pairSignals[norm(pair.display)];
     if (!hit || (hit.signal !== 'UP' && hit.signal !== 'DOWN')) return '';
-    var up = hit.signal === 'UP';
-    var color = up ? '#00ff6a' : '#ff1744';
-    var bg = up ? 'rgba(0,255,106,.16)' : 'rgba(255,23,68,.16)';
-    return '<span style="color:' + color + ';background:' + bg + ';font-size:12px;font-weight:900;letter-spacing:.4px;border-radius:999px;padding:4px 8px;white-space:nowrap;">СИГНАЛ · ' + (up ? 'CALL' : 'PUT') + '</span>';
-  }
-
-  function metaChips(pair) {
-    var closed = pair.active === false;
-    var otc = /OTC/i.test(pair.display || '') || /_otc$/i.test(pair.symbol || '');
-    var id = pair.symbol || '';
-    var payColor = closed ? '#8d97a6' : (pair.payout >= 92 ? '#1fd47a' : '#3dff8a');
-    var html = '';
-    if (id) html += '<span style="font-size:10px;font-weight:800;color:#9eb6ff;">ID ' + esc(id) + '</span>';
-    if (otc) html += '<span style="font-size:10px;font-weight:900;color:#fff;background:#3d8bff;border-radius:999px;padding:2px 7px;line-height:1.4;">ОТК</span>';
-    html += '<span style="color:' + payColor + ';font-weight:900;">' + (pair.payout || 0) + '%</span>';
-    return html;
+    var color = hit.signal === 'UP' ? '#00ff6a' : '#ff1744';
+    return '<span style="color:' + color + ';font-size:11px;font-weight:900;letter-spacing:.2px;">СИГНАЛ</span>';
   }
 
   function renderLivePairs() {
@@ -617,7 +625,7 @@
         row.className = 'pair-row';
         row.setAttribute('data-pair', pair.display);
         row.style.setProperty('display', 'grid', 'important');
-        row.style.gridTemplateColumns = 'minmax(0,1fr) auto minmax(72px,1fr)';
+        row.style.gridTemplateColumns = 'minmax(0,1fr) auto minmax(0,1fr)';
         row.style.alignItems = 'center';
         row.style.columnGap = '8px';
         if (closed) {
@@ -631,7 +639,8 @@
           var hit = pairSignals[norm(pair.display)];
           row.style.borderColor = hit && hit.signal === 'DOWN' ? '#ff1744' : '#00ff6a';
         }
-        row.innerHTML = '<span style="display:flex;align-items:center;gap:8px;min-width:0;"><canvas class="po-row-spark" width="72" height="28" data-pair="' + esc(pair.display) + '" style="width:72px;height:28px;flex:0 0 auto;background:#0b1118;border-radius:8px;"></canvas><span style="display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap;"><span style="font-weight:900;">' + esc(pair.display) + '</span>' + metaChips(pair) + '</span></span><span class="po-row-signal" style="justify-self:center;text-align:center;white-space:nowrap;">' + signalMark(pair) + '</span><span style="display:flex;align-items:center;justify-content:flex-end;"><span class="po-next-badge">' + badgeFor(pair) + '</span></span>';
+        var payColor = closed ? '#8d97a6' : '#3dff8a';
+        row.innerHTML = '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800;">' + esc(pair.display) + '</span><span class="po-row-signal" style="justify-self:center;text-align:center;white-space:nowrap;">' + signalMark(pair) + '</span><span style="justify-self:end;display:flex;align-items:center;gap:6px;white-space:nowrap;font-weight:900;color:' + payColor + ';"><span>' + (pair.payout || 0) + '%</span><span class="po-next-badge">' + badgeFor(pair) + '</span></span>';
         renderBox.appendChild(row);
       });
     }
@@ -702,14 +711,27 @@
   }
 
   async function runBoard(cat, gen) {
-    var list = ((liveCats && liveCats[cat]) || []).filter(function (p) { return p.active !== false; });
-    var title = cat === 'forex' ? 'Валюты' : 'Пары';
+    if (cat !== 'forex') {
+      paintBoard('Сигналы только по валютам с выплатой 92%.');
+      refreshBadges();
+      if (gen === boardRun.gen) boardRun.running = false;
+      return;
+    }
+    var list = ((liveCats && liveCats.forex) || []).filter(hotForex);
     var stats = { call: 0, put: 0, wait: 0, wins: 0, losses: 0, pushes: 0, skip: 0, done: 0, bars: 0 };
     pinClock = 0;
+    var allowed = {};
+    for (var allowI = 0; allowI < list.length; allowI++) allowed[norm(list[allowI].display)] = 1;
+    Object.keys(pairSignals).forEach(function (key) { if (!allowed[key]) delete pairSignals[key]; });
     for (var resetI = 0; resetI < list.length; resetI++) delete pairSignals[norm(list[resetI].display)];
     restorePayoutOrder(cat);
     refreshBadges();
-    paintBoard(title + ': сканирую все ' + list.length + '. Сигнал на следующую минуту считается по закрытым свечам. Найденный вход сразу встаёт наверх.');
+    if (!list.length) {
+      paintBoard('Сейчас нет открытых валют с выплатой 92%.');
+      if (gen === boardRun.gen) boardRun.running = false;
+      return;
+    }
+    paintBoard('Валюты 92%: сканирую ' + list.length + '. Найденный сигнал сразу пишется на строке и встаёт наверх.');
     var cursor = 0;
     async function worker() {
       while (cursor < list.length && gen === boardRun.gen) {
@@ -756,7 +778,7 @@
         stats.done += 1;
         refreshBadges();
         if (pairSignals[norm(name)] && pairSignals[norm(name)].pin) liftSignalRow(name);
-        paintBoard(title + ': ' + stats.done + ' из ' + list.length + '. На эту минуту CALL ' + stats.call + ', PUT ' + stats.put + ', нет сделки ' + stats.wait + '. На этих же закрытых минутах: плюс ' + stats.wins + ', минус ' + stats.losses + ', пропуск ' + stats.skip + '. Плюс и минус — проверка прошлых минут, не обещание следующей.');
+        paintBoard('Валюты 92%: ' + stats.done + ' из ' + list.length + '. CALL ' + stats.call + ', PUT ' + stats.put + ', без входа ' + stats.wait + '. На прошлых минутах плюс ' + stats.wins + ', минус ' + stats.losses + '.');
       }
     }
     await Promise.all([worker(), worker(), worker(), worker()]);
@@ -1246,7 +1268,7 @@
         var loaded = await loadScan(pairName, tf);
         var pack = loaded.pack;
         var fromPocket = isPocketHistory(pack.candles, pack.source);
-        var raw = analyzeMarket(pack.candles, pack.ticks, loaded.m5, loaded.frames, { quoteAt: pack.quoteAt, receivedAt: pack.receivedAt });
+        var raw = gateSignal(pairName, analyzeMarket(pack.candles, pack.ticks, loaded.m5, loaded.frames, { quoteAt: pack.quoteAt, receivedAt: pack.receivedAt }));
         var analysis = presentSignal(pairName, tf, raw);
         if (fromPocket) {
           gradeJournal(pack.candles, pack.ticks);
@@ -1270,7 +1292,7 @@
             var freshLoad = await loadScan(pairName, tf);
             var fresh = freshLoad.pack;
             var liveOk = isPocketHistory(fresh.candles, fresh.source);
-            var rawLive = analyzeMarket(fresh.candles, fresh.ticks, freshLoad.m5, freshLoad.frames, { quoteAt: fresh.quoteAt, receivedAt: fresh.receivedAt });
+            var rawLive = gateSignal(pairName, analyzeMarket(fresh.candles, fresh.ticks, freshLoad.m5, freshLoad.frames, { quoteAt: fresh.quoteAt, receivedAt: fresh.receivedAt }));
             var live = presentSignal(pairName, tf, rawLive);
             if (liveOk) {
               gradeJournal(fresh.candles, fresh.ticks);
