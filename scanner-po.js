@@ -480,7 +480,25 @@
   }
 
   var pairSignals = {};
+  var pinClock = 0;
   var boardRun = { cat: '', minute: 0, gen: 0 };
+
+  function esc(text) {
+    return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function pairByName(name) {
+    var cat = (liveCats && liveCats[activeCategory()]) || [];
+    for (var i = 0; i < cat.length; i++) if (cat[i].display === name) return cat[i];
+    return null;
+  }
+
+  function entryPin(pair) {
+    if (!pair || pair.active === false) return 0;
+    var hit = pairSignals[norm(pair.display)];
+    if (!hit || (hit.signal !== 'UP' && hit.signal !== 'DOWN')) return 0;
+    return hit.pin || 0;
+  }
 
   function ensureBoard() {
     if ($('slv-all-board')) return;
@@ -508,6 +526,26 @@
     return '<span style="color:#8ea2ff;font-size:11px;font-weight:900;">НЕТ СДЕЛКИ</span>';
   }
 
+  function signalMark(pair) {
+    if (!pair || pair.active === false) return '';
+    var hit = pairSignals[norm(pair.display)];
+    if (!hit || (hit.signal !== 'UP' && hit.signal !== 'DOWN')) return '';
+    var color = hit.signal === 'UP' ? '#00ff6a' : '#ff1744';
+    return '<span style="color:' + color + ';font-size:13px;font-weight:900;letter-spacing:.8px;">СИГНАЛ</span>';
+  }
+
+  function metaChips(pair) {
+    var closed = pair.active === false;
+    var otc = /OTC/i.test(pair.display || '') || /_otc$/i.test(pair.symbol || '');
+    var id = pair.symbol || '';
+    var payColor = closed ? '#8d97a6' : (pair.payout >= 92 ? '#1fd47a' : '#3dff8a');
+    var html = '';
+    if (id) html += '<span style="font-size:10px;font-weight:800;color:#9eb6ff;">ID ' + esc(id) + '</span>';
+    if (otc) html += '<span style="font-size:10px;font-weight:900;color:#fff;background:#3d8bff;border-radius:999px;padding:2px 7px;line-height:1.4;">ОТК</span>';
+    html += '<span style="color:' + payColor + ';font-weight:900;">' + (pair.payout || 0) + '%</span>';
+    return html;
+  }
+
   function renderLivePairs() {
     var renderBox = $('analysis-pairs-render-box');
     if (!renderBox || !liveCats) return false;
@@ -516,6 +554,7 @@
     var q = search ? search.value.toUpperCase().trim() : '';
     var base = liveCats[activeCategory()] || [];
     var filtered = q ? base.filter(function (p) { return p.display.toUpperCase().indexOf(q) !== -1; }) : base.slice();
+    filtered.sort(function (a, b) { return entryPin(b) - entryPin(a); });
     renderBox.innerHTML = '';
     if (!filtered.length) {
       renderBox.innerHTML = '<div style="color:#9a9484;text-align:center;font-size:13px;padding:30px;font-weight:600;">Тикер не найден в этой категории.</div>';
@@ -525,15 +564,22 @@
         var closed = pair.active === false;
         row.className = 'pair-row';
         row.setAttribute('data-pair', pair.display);
+        row.style.setProperty('display', 'grid', 'important');
+        row.style.gridTemplateColumns = 'minmax(0,1fr) auto minmax(72px,1fr)';
+        row.style.alignItems = 'center';
+        row.style.columnGap = '8px';
         if (closed) {
           row.style.opacity = '0.45';
           row.style.cursor = 'default';
         } else {
           row.addEventListener('click', function () { window.launchFullscreenAnalysis(pair.display); });
         }
-        var pay = '<span style="color:' + (closed ? '#8d97a6' : '#3dff8a') + ';font-weight:900;margin-right:8px;">' + (pair.payout || 0) + '%</span>';
-        var top = !closed && pair.payout >= 92 ? ' <span style="font-size:10px;color:#1fd47a;font-weight:800;">92+</span>' : '';
-        row.innerHTML = '<span style="display:flex;align-items:center;gap:8px;min-width:0;"><canvas class="po-row-spark" width="72" height="28" data-pair="' + pair.display.replace(/"/g, '') + '" style="width:72px;height:28px;flex:0 0 auto;background:#0b1118;border-radius:8px;"></canvas><span>' + pair.display + top + '</span></span><span style="display:flex;align-items:center;gap:8px;">' + pay + '<span class="po-next-badge">' + badgeFor(pair) + '</span></span>';
+        var hot = entryPin(pair);
+        if (hot) {
+          var hit = pairSignals[norm(pair.display)];
+          row.style.borderColor = hit && hit.signal === 'DOWN' ? '#ff1744' : '#00ff6a';
+        }
+        row.innerHTML = '<span style="display:flex;align-items:center;gap:8px;min-width:0;"><canvas class="po-row-spark" width="72" height="28" data-pair="' + esc(pair.display) + '" style="width:72px;height:28px;flex:0 0 auto;background:#0b1118;border-radius:8px;"></canvas><span style="display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap;"><span style="font-weight:900;">' + esc(pair.display) + '</span>' + metaChips(pair) + '</span></span><span class="po-row-signal" style="justify-self:center;text-align:center;white-space:nowrap;">' + signalMark(pair) + '</span><span style="display:flex;align-items:center;justify-content:flex-end;"><span class="po-next-badge">' + badgeFor(pair) + '</span></span>';
         renderBox.appendChild(row);
       });
     }
@@ -548,14 +594,48 @@
     if (!box) return;
     var rows = box.querySelectorAll('.pair-row');
     for (var i = 0; i < rows.length; i++) {
-      var badge = rows[i].querySelector('.po-next-badge');
       var name = rows[i].getAttribute('data-pair');
-      if (!badge || !name || !liveCats) continue;
-      var cat = liveCats[activeCategory()] || [];
-      var pair = null;
-      for (var j = 0; j < cat.length; j++) if (cat[j].display === name) pair = cat[j];
-      if (pair) badge.innerHTML = badgeFor(pair);
+      if (!name || !liveCats) continue;
+      var pair = pairByName(name);
+      if (!pair) continue;
+      var badge = rows[i].querySelector('.po-next-badge');
+      var mark = rows[i].querySelector('.po-row-signal');
+      if (badge) badge.innerHTML = badgeFor(pair);
+      if (mark) mark.innerHTML = signalMark(pair);
+      var hit = pairSignals[norm(name)];
+      var hot = pair.active !== false && hit && (hit.signal === 'UP' || hit.signal === 'DOWN');
+      rows[i].style.borderColor = hot ? (hit.signal === 'UP' ? '#00ff6a' : '#ff1744') : '';
     }
+  }
+
+  function restorePayoutOrder(cat) {
+    var box = $('analysis-pairs-render-box');
+    var list = (liveCats && liveCats[cat]) || [];
+    if (!box) return;
+    var byName = {};
+    var rows = box.querySelectorAll('.pair-row');
+    for (var i = 0; i < rows.length; i++) byName[rows[i].getAttribute('data-pair')] = rows[i];
+    for (var j = 0; j < list.length; j++) {
+      var row = byName[list[j].display];
+      if (!row) continue;
+      row.style.borderColor = '';
+      box.appendChild(row);
+    }
+  }
+
+  function liftSignalRow(name) {
+    var box = $('analysis-pairs-render-box');
+    if (!box) return;
+    var hit = pairSignals[norm(name)];
+    if (!hit || (hit.signal !== 'UP' && hit.signal !== 'DOWN')) return;
+    var rows = box.querySelectorAll('.pair-row');
+    var row = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].getAttribute('data-pair') === name) { row = rows[i]; break; }
+    }
+    if (!row) return;
+    if (box.firstElementChild !== row) box.insertBefore(row, box.firstElementChild);
+    box.scrollTop = 0;
   }
 
   function scheduleBoard() {
@@ -573,7 +653,11 @@
     var list = ((liveCats && liveCats[cat]) || []).filter(function (p) { return p.active !== false; });
     var title = cat === 'forex' ? 'Валюты' : 'Пары';
     var stats = { call: 0, put: 0, wait: 0, wins: 0, losses: 0, pushes: 0, skip: 0, done: 0, bars: 0 };
-    paintBoard(title + ': сканирую все ' + list.length + '. Сигнал на следующую минуту считается по закрытым свечам.');
+    pinClock = 0;
+    for (var resetI = 0; resetI < list.length; resetI++) delete pairSignals[norm(list[resetI].display)];
+    restorePayoutOrder(cat);
+    refreshBadges();
+    paintBoard(title + ': сканирую все ' + list.length + '. Сигнал на следующую минуту считается по закрытым свечам. Найденный вход сразу встаёт наверх.');
     var cursor = 0;
     async function worker() {
       while (cursor < list.length && gen === boardRun.gen) {
@@ -595,13 +679,16 @@
             lastTickAt: lastT ? lastT + 60000 : 0
           });
           var report = (fromPocket && window.SignalEngine && window.SignalEngine.backtest) ? window.SignalEngine.backtest(rows, name) : null;
+          var direction = board ? board.direction : 'NO_TRADE';
+          var tradable = direction === 'UP' || direction === 'DOWN';
           pairSignals[norm(name)] = {
-            signal: board ? board.direction : 'NO_TRADE',
+            signal: direction,
             score: board ? board.score : 0,
-            reason: board ? board.reason : 'Нет свечей терминала.'
+            reason: board ? board.reason : 'Нет свечей терминала.',
+            pin: tradable ? ++pinClock : 0
           };
-          if (board && board.direction === 'UP') stats.call += 1;
-          else if (board && board.direction === 'DOWN') stats.put += 1;
+          if (direction === 'UP') stats.call += 1;
+          else if (direction === 'DOWN') stats.put += 1;
           else stats.wait += 1;
           if (report) {
             stats.wins += report.all.wins || 0;
@@ -616,6 +703,7 @@
         }
         stats.done += 1;
         refreshBadges();
+        if (pairSignals[norm(name)] && pairSignals[norm(name)].pin) liftSignalRow(name);
         paintBoard(title + ': ' + stats.done + ' из ' + list.length + '. На эту минуту CALL ' + stats.call + ', PUT ' + stats.put + ', нет сделки ' + stats.wait + '. На этих же закрытых минутах: плюс ' + stats.wins + ', минус ' + stats.losses + ', пропуск ' + stats.skip + '. Плюс и минус — проверка прошлых минут, не обещание следующей.');
       }
     }
