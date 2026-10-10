@@ -479,9 +479,39 @@
     el.textContent = text;
   }
 
+  var pairSignals = {};
+  var boardRun = { cat: '', minute: 0, gen: 0 };
+
+  function ensureBoard() {
+    if ($('slv-all-board')) return;
+    var box = $('analysis-pairs-render-box');
+    if (!box || !box.parentElement) return;
+    var el = document.createElement('div');
+    el.id = 'slv-all-board';
+    el.style.cssText = 'margin:0 0 10px;padding:12px 14px;border-radius:18px;background:rgba(0,0,0,.4);border:1px solid rgba(142,162,255,.35);color:#d5deea;font-size:12px;font-weight:700;line-height:1.45;';
+    el.textContent = 'Сканирую все пары этой вкладки на следующую минуту…';
+    box.parentElement.insertBefore(el, box);
+  }
+
+  function paintBoard(text) {
+    ensureBoard();
+    var el = $('slv-all-board');
+    if (el) el.textContent = text;
+  }
+
+  function badgeFor(pair) {
+    if (pair.active === false) return '<span style="color:#ff4d6d;font-size:11px;font-weight:900;">ЗАКРЫТА</span>';
+    var hit = pairSignals[norm(pair.display)];
+    if (!hit) return '<span style="color:#8ea2ff;font-size:11px;font-weight:900;">ЖДУ</span>';
+    if (hit.signal === 'UP') return '<span style="color:#00ff6a;font-size:12px;font-weight:900;">CALL ' + hit.score + '</span>';
+    if (hit.signal === 'DOWN') return '<span style="color:#ff1744;font-size:12px;font-weight:900;">PUT ' + hit.score + '</span>';
+    return '<span style="color:#8ea2ff;font-size:11px;font-weight:900;">НЕТ СДЕЛКИ</span>';
+  }
+
   function renderLivePairs() {
     var renderBox = $('analysis-pairs-render-box');
     if (!renderBox || !liveCats) return false;
+    ensureBoard();
     var search = $('analysis-search-input');
     var q = search ? search.value.toUpperCase().trim() : '';
     var base = liveCats[activeCategory()] || [];
@@ -494,6 +524,7 @@
         var row = document.createElement('div');
         var closed = pair.active === false;
         row.className = 'pair-row';
+        row.setAttribute('data-pair', pair.display);
         if (closed) {
           row.style.opacity = '0.45';
           row.style.cursor = 'default';
@@ -502,17 +533,94 @@
         }
         var pay = '<span style="color:' + (closed ? '#8d97a6' : '#3dff8a') + ';font-weight:900;margin-right:8px;">' + (pair.payout || 0) + '%</span>';
         var top = !closed && pair.payout >= 92 ? ' <span style="font-size:10px;color:#1fd47a;font-weight:800;">92+</span>' : '';
-        var state = closed
-          ? '<span style="color:#ff4d6d;font-size:11px;font-weight:900;">ЗАКРЫТА</span>'
-          : '<span style="color:var(--neon-green);font-size:13px;font-weight:900;">M1 →</span>';
-        row.innerHTML = '<span style="display:flex;align-items:center;gap:8px;min-width:0;"><canvas class="po-row-spark" width="72" height="28" data-pair="' + pair.display.replace(/"/g, '') + '" style="width:72px;height:28px;flex:0 0 auto;background:#0b1118;border-radius:8px;"></canvas><span>' + pair.display + top + '</span></span><span>' + pay + state + '</span>';
+        row.innerHTML = '<span style="display:flex;align-items:center;gap:8px;min-width:0;"><canvas class="po-row-spark" width="72" height="28" data-pair="' + pair.display.replace(/"/g, '') + '" style="width:72px;height:28px;flex:0 0 auto;background:#0b1118;border-radius:8px;"></canvas><span>' + pair.display + top + '</span></span><span style="display:flex;align-items:center;gap:8px;">' + pay + '<span class="po-next-badge">' + badgeFor(pair) + '</span></span>';
         renderBox.appendChild(row);
       });
-      queueRowSparks(renderBox);
     }
     var countEl = $('total-assets-count');
     if (countEl) countEl.textContent = String(liveTotal);
+    scheduleBoard();
     return true;
+  }
+
+  function refreshBadges() {
+    var box = $('analysis-pairs-render-box');
+    if (!box) return;
+    var rows = box.querySelectorAll('.pair-row');
+    for (var i = 0; i < rows.length; i++) {
+      var badge = rows[i].querySelector('.po-next-badge');
+      var name = rows[i].getAttribute('data-pair');
+      if (!badge || !name || !liveCats) continue;
+      var cat = liveCats[activeCategory()] || [];
+      var pair = null;
+      for (var j = 0; j < cat.length; j++) if (cat[j].display === name) pair = cat[j];
+      if (pair) badge.innerHTML = badgeFor(pair);
+    }
+  }
+
+  function scheduleBoard() {
+    var cat = activeCategory();
+    var minute = Math.floor(Date.now() / 60000);
+    if (boardRun.cat === cat && boardRun.minute === minute) return;
+    boardRun.cat = cat;
+    boardRun.minute = minute;
+    boardRun.running = true;
+    var gen = ++boardRun.gen;
+    runBoard(cat, gen);
+  }
+
+  async function runBoard(cat, gen) {
+    var list = ((liveCats && liveCats[cat]) || []).filter(function (p) { return p.active !== false; });
+    var title = cat === 'forex' ? 'Валюты' : 'Пары';
+    var stats = { call: 0, put: 0, wait: 0, wins: 0, losses: 0, pushes: 0, skip: 0, done: 0, bars: 0 };
+    paintBoard(title + ': сканирую все ' + list.length + '. Сигнал на следующую минуту считается по закрытым свечам.');
+    var cursor = 0;
+    async function worker() {
+      while (cursor < list.length && gen === boardRun.gen) {
+        var pair = list[cursor++];
+        var name = pair.display;
+        try {
+          var pack = await fetchPocketCandles(name, 1, 60);
+          if (gen !== boardRun.gen) return;
+          var rows = settledBars(sanitizeCandles(pack.candles));
+          var canvas = document.querySelector('canvas.po-row-spark[data-pair="' + name.replace(/"/g, '') + '"]');
+          if (canvas) drawSpark(canvas, rows);
+          var lastT = rows.length ? Number(rows[rows.length - 1].t) : 0;
+          if (lastT > 0 && lastT < 1000000000000) lastT *= 1000;
+          var fromPocket = isPocketHistory(rows, pack.source);
+          var board = (!fromPocket || !window.SignalEngine) ? null : window.SignalEngine.decide({
+            pair: name,
+            m1: rows,
+            now: Date.now(),
+            lastTickAt: lastT ? lastT + 60000 : 0
+          });
+          var report = (fromPocket && window.SignalEngine && window.SignalEngine.backtest) ? window.SignalEngine.backtest(rows, name) : null;
+          pairSignals[norm(name)] = {
+            signal: board ? board.direction : 'NO_TRADE',
+            score: board ? board.score : 0,
+            reason: board ? board.reason : 'Нет свечей терминала.'
+          };
+          if (board && board.direction === 'UP') stats.call += 1;
+          else if (board && board.direction === 'DOWN') stats.put += 1;
+          else stats.wait += 1;
+          if (report) {
+            stats.wins += report.all.wins || 0;
+            stats.losses += report.all.losses || 0;
+            stats.pushes += report.all.pushes || 0;
+            stats.skip += report.noTrade || 0;
+            stats.bars += report.evaluatedBars || 0;
+          }
+        } catch (e) {
+          pairSignals[norm(name)] = { signal: 'NO_TRADE', score: 0, reason: 'Свечи не пришли.' };
+          stats.wait += 1;
+        }
+        stats.done += 1;
+        refreshBadges();
+        paintBoard(title + ': ' + stats.done + ' из ' + list.length + '. На эту минуту CALL ' + stats.call + ', PUT ' + stats.put + ', нет сделки ' + stats.wait + '. На этих же закрытых минутах: плюс ' + stats.wins + ', минус ' + stats.losses + ', пропуск ' + stats.skip + '. Плюс и минус — проверка прошлых минут, не обещание следующей.');
+      }
+    }
+    await Promise.all([worker(), worker()]);
+    if (gen === boardRun.gen) boardRun.running = false;
   }
 
 
@@ -550,10 +658,8 @@
   var sparkQueue = [];
   var sparkBusy = false;
   function queueRowSparks(root) {
-    var nodes = root.querySelectorAll('canvas.po-row-spark');
-    sparkQueue = [];
-    for (var i = 0; i < nodes.length && i < 8; i++) sparkQueue.push(nodes[i]);
-    pumpSparks();
+    if (!root) return;
+    scheduleBoard();
   }
   function pumpSparks() {
     if (sparkBusy || !sparkQueue.length) return;

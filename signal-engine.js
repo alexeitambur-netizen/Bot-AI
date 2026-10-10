@@ -222,6 +222,42 @@
     return null;
   }
 
+  function mean(list) {
+    if (!list.length) return 0;
+    return list.reduce(function (a, b) { return a + b; }, 0) / list.length;
+  }
+
+  function cci(rows, period) {
+    period = period || 20;
+    if (!rows || rows.length < period) return null;
+    var tp = rows.map(function (row) { return (row.high + row.low + row.close) / 3; });
+    var slice = tp.slice(-period);
+    var mid = mean(slice);
+    var dev = mean(slice.map(function (v) { return Math.abs(v - mid); }));
+    if (!dev) return 0;
+    return (tp[tp.length - 1] - mid) / (0.015 * dev);
+  }
+
+  function roc(values, period) {
+    period = period || 9;
+    if (!values || values.length <= period) return null;
+    var prev = values[values.length - 1 - period];
+    if (!(prev > 0)) return null;
+    return (values[values.length - 1] - prev) / prev * 100;
+  }
+
+  function awesome(rows) {
+    if (!rows || rows.length < 35) return null;
+    var mid = rows.map(function (row) { return (row.high + row.low) / 2; });
+    function smaEnd(list, n) {
+      return mean(list.slice(-n));
+    }
+    return {
+      now: smaEnd(mid, 5) - smaEnd(mid, 34),
+      prev: smaEnd(mid.slice(0, -1), 5) - smaEnd(mid.slice(0, -1), 34)
+    };
+  }
+
   function rangePos(rows) {
     var slice = (rows || []).slice(-20);
     if (slice.length < 8) return 0.5;
@@ -309,6 +345,23 @@
       } else if (stoch.k > stoch.d && stoch.k < 80) momentum.up += 26;
       else if (stoch.k < stoch.d && stoch.k > 20) momentum.down += 26;
     }
+    var cciNow = cci(m1, 20);
+    var rocNow = roc(values, 9);
+    var aoNow = awesome(m1);
+    if (cciNow != null) {
+      if (cciNow > 0) momentum.up += 12;
+      else if (cciNow < 0) momentum.down += 12;
+    }
+    if (rocNow != null) {
+      if (rocNow > 0) momentum.up += 10;
+      else if (rocNow < 0) momentum.down += 10;
+    }
+    if (aoNow) {
+      if (aoNow.now > 0 && aoNow.now >= aoNow.prev) momentum.up += 12;
+      else if (aoNow.now < 0 && aoNow.now <= aoNow.prev) momentum.down += 12;
+    }
+    momentum.up = clamp(momentum.up, 0, 100);
+    momentum.down = clamp(momentum.down, 0, 100);
 
     var tradable = 80;
     var ratio = vol.ratio;
@@ -345,6 +398,10 @@
     else if (alignedDown && price < e21) levels.down += 40;
     else if (pos <= 0.25) levels.up += 50;
     else if (pos >= 0.75) levels.down += 50;
+    if (bands) {
+      if (price > bands.mid) levels.up += 10;
+      else if (price < bands.mid) levels.down += 10;
+    }
 
     var side3 = tfSide(m3);
     var side5 = tfSide(m5);
@@ -400,6 +457,9 @@
       bbUpper: bands ? round(bands.upper, 5) : null,
       bbMiddle: bands ? round(bands.mid, 5) : null,
       bbLower: bands ? round(bands.lower, 5) : null,
+      cci: round(cciNow, 2),
+      roc: round(rocNow, 4),
+      ao: aoNow ? round(aoNow.now, 6) : null,
       vwap: null,
       support: round(m1.slice(-20).reduce(function (lo, row) { return Math.min(lo, row.low); }, Infinity), 5),
       resistance: round(m1.slice(-20).reduce(function (hi, row) { return Math.max(hi, row.high); }, -Infinity), 5),
