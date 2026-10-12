@@ -300,10 +300,18 @@
     var settled = settledBars(series, tfNow);
     var fib = fibRetracement(settled.slice(-160));
     var board = decideSeries(series, tfNow, frames && frames.pair);
-    var wait = board ? !!board.wait : true;
-    var isUp = board ? !!board.isUp : false;
-    var accuracy = board ? board.score : 0;
-    var reason = board ? board.reason : 'Движок сигнала не загружен.';
+    var wait = true;
+    var isUp = false;
+    var accuracy = 0;
+    var reason = 'Нет сигнала';
+    if (board && !board.wait && (board.score || 0) >= 68) {
+      wait = false;
+      isUp = !!board.isUp;
+      accuracy = board.score || 72;
+      reason = board.reason || 'SignalEngine: подтверждения сошлись.';
+    } else if (board) {
+      reason = board.reason || 'Счёт ниже порога или условия не сошлись.';
+    }
     var slice = use.slice(-20);
     var vol = 0;
     slice.forEach(function (c) { vol += (c.high - c.low) / (c.close || 1); });
@@ -509,12 +517,12 @@
         var id = norm(row.display);
         if (!id || seen[id]) return false;
         seen[id] = true;
+        // Same as VIP-COMMUNITY: only active pairs with payout >= 80
+        if (row.active === false) return false;
+        if ((row.payout || 0) < 80) return false;
         return true;
       });
       cats[k].sort(function (a, b) {
-        var ao = a.active === false ? 1 : 0;
-        var bo = b.active === false ? 1 : 0;
-        if (ao !== bo) return ao - bo;
         return (b.payout || 0) - (a.payout || 0);
       });
       total += cats[k].length;
@@ -1385,3 +1393,4 @@
     boot();
   }
 })();
+
