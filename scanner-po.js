@@ -300,17 +300,24 @@
     var settled = settledBars(series, tfNow);
     var fib = fibRetracement(settled.slice(-160));
     var board = decideSeries(series, tfNow, frames && frames.pair);
-    var wait = true;
+    var wait = false; // Всегда выдаём сигнал: вверх или вниз
     var isUp = false;
-    var accuracy = 0;
-    var reason = 'Нет сигнала';
-    if (board && !board.wait && (board.score || 0) >= 68) {
-      wait = false;
-      isUp = !!board.isUp;
-      accuracy = board.score || 72;
-      reason = board.reason || 'SignalEngine: подтверждения сошлись.';
-    } else if (board) {
-      reason = board.reason || 'Счёт ниже порога или условия не сошлись.';
+    var accuracy = 50;
+    var reason = 'Сигнал по умолчанию';
+    if (board) {
+      // Берём сторону с большим счётом, даже если ниже порога
+      var upSc = board.up || 0;
+      var downSc = board.down || 0;
+      isUp = upSc >= downSc;
+      accuracy = Math.max(upSc, downSc, board.score || 50);
+      reason = board.reason || (isUp ? 'CALL по счёту' : 'PUT по счёту');
+      if (accuracy < 60) reason += ' (слабый сигнал)';
+    } else {
+      // Fallback если движок не ответил
+      var drift = lastClosed.close - (use.length > 3 ? use[use.length - 4].close : lastClosed.open);
+      isUp = drift >= 0;
+      accuracy = 55;
+      reason = isUp ? 'CALL по дрейфу' : 'PUT по дрейфу';
     }
     var slice = use.slice(-20);
     var vol = 0;
