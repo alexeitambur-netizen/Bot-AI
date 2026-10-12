@@ -5,8 +5,8 @@
   if (root) root.SignalEngine = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   var SETTINGS = {
-    minScore: 60,
-    minGap: 8,
+    minScore: 75,
+    minGap: 15,
     maxDataAgeMs: 90000,
     weights: { trend: 25, momentum: 20, volatility: 10, priceAction: 20, levels: 10, mtf: 15 },
     pairs: {}
@@ -222,42 +222,6 @@
     return null;
   }
 
-  function mean(list) {
-    if (!list.length) return 0;
-    return list.reduce(function (a, b) { return a + b; }, 0) / list.length;
-  }
-
-  function cci(rows, period) {
-    period = period || 20;
-    if (!rows || rows.length < period) return null;
-    var tp = rows.map(function (row) { return (row.high + row.low + row.close) / 3; });
-    var slice = tp.slice(-period);
-    var mid = mean(slice);
-    var dev = mean(slice.map(function (v) { return Math.abs(v - mid); }));
-    if (!dev) return 0;
-    return (tp[tp.length - 1] - mid) / (0.015 * dev);
-  }
-
-  function roc(values, period) {
-    period = period || 9;
-    if (!values || values.length <= period) return null;
-    var prev = values[values.length - 1 - period];
-    if (!(prev > 0)) return null;
-    return (values[values.length - 1] - prev) / prev * 100;
-  }
-
-  function awesome(rows) {
-    if (!rows || rows.length < 35) return null;
-    var mid = rows.map(function (row) { return (row.high + row.low) / 2; });
-    function smaEnd(list, n) {
-      return mean(list.slice(-n));
-    }
-    return {
-      now: smaEnd(mid, 5) - smaEnd(mid, 34),
-      prev: smaEnd(mid.slice(0, -1), 5) - smaEnd(mid.slice(0, -1), 34)
-    };
-  }
-
   function rangePos(rows) {
     var slice = (rows || []).slice(-20);
     if (slice.length < 8) return 0.5;
@@ -272,29 +236,6 @@
     return (slice[slice.length - 1].close - lo) / span;
   }
 
-  function barSide(bar) {
-    if (!bar || !(bar.close > 0) || !(bar.open > 0)) return null;
-    if (bar.close > bar.open) return 'UP';
-    if (bar.close < bar.open) return 'DOWN';
-    return null;
-  }
-
-  // Next bar is not in the packet. It opens at the previous close.
-  // Call it only from a new closed body. A color already printed again is skipped,
-  // so a lagging average cannot keep the same side for several bars.
-  function nextCandleRead(rows) {
-    if (!rows || rows.length < 2) return null;
-    var last = rows[rows.length - 1];
-    var prev = rows[rows.length - 2];
-    var side = barSide(last);
-    var prevSide = barSide(prev);
-    if (!side || !prevSide || side === prevSide) return null;
-    var range = Math.max(last.high - last.low, 0);
-    var body = Math.abs(last.close - last.open);
-    if (!(range > 0) || body / range < 0.35) return null;
-    return side;
-  }
-
   function decide(input) {
     input = input || {};
     var cfg = settingsFor(input.pair);
@@ -306,7 +247,7 @@
     function none(reason) {
       return card('NO_TRADE', 0, 0, 'UNCERTAIN', reason, dataAge, input, {});
     }
-    if (m1.length < 60) return none('Мало закрытых свечей этого таймфрейма.');
+    if (m1.length < 60) return none('Мало закрытых минутных свечей.');
     if (now && newest && dataAge > cfg.maxDataAgeMs) return none('Котировка устарела: ' + dataAge + ' мс.');
 
     var values = closesOf(m1);
@@ -368,23 +309,6 @@
       } else if (stoch.k > stoch.d && stoch.k < 80) momentum.up += 26;
       else if (stoch.k < stoch.d && stoch.k > 20) momentum.down += 26;
     }
-    var cciNow = cci(m1, 20);
-    var rocNow = roc(values, 9);
-    var aoNow = awesome(m1);
-    if (cciNow != null) {
-      if (cciNow > 0) momentum.up += 12;
-      else if (cciNow < 0) momentum.down += 12;
-    }
-    if (rocNow != null) {
-      if (rocNow > 0) momentum.up += 10;
-      else if (rocNow < 0) momentum.down += 10;
-    }
-    if (aoNow) {
-      if (aoNow.now > 0 && aoNow.now >= aoNow.prev) momentum.up += 12;
-      else if (aoNow.now < 0 && aoNow.now <= aoNow.prev) momentum.down += 12;
-    }
-    momentum.up = clamp(momentum.up, 0, 100);
-    momentum.down = clamp(momentum.down, 0, 100);
 
     var tradable = 80;
     var ratio = vol.ratio;
@@ -421,10 +345,6 @@
     else if (alignedDown && price < e21) levels.down += 40;
     else if (pos <= 0.25) levels.up += 50;
     else if (pos >= 0.75) levels.down += 50;
-    if (bands) {
-      if (price > bands.mid) levels.up += 10;
-      else if (price < bands.mid) levels.down += 10;
-    }
 
     var side3 = tfSide(m3);
     var side5 = tfSide(m5);
@@ -454,6 +374,7 @@
     var gap = Math.abs(upScore - downScore);
     var blocks = [];
     if (tradable < 40) blocks.push(state === 'LOW_VOLATILITY' ? 'Слишком тихий рынок.' : 'Слишком рваный рынок.');
+    if (state === 'UNCERTAIN') blocks.push('Состояние рынка неясно.');
     if (state === 'TREND_UP' && direction === 'DOWN') blocks.push('Минутный счёт против восходящего контекста.');
     if (state === 'TREND_DOWN' && direction === 'UP') blocks.push('Минутный счёт против нисходящего контекста.');
     if (state === 'RANGE' && pos > 0.25 && pos < 0.75) blocks.push('Флэт в середине диапазона.');
@@ -479,9 +400,6 @@
       bbUpper: bands ? round(bands.upper, 5) : null,
       bbMiddle: bands ? round(bands.mid, 5) : null,
       bbLower: bands ? round(bands.lower, 5) : null,
-      cci: round(cciNow, 2),
-      roc: round(rocNow, 4),
-      ao: aoNow ? round(aoNow.now, 6) : null,
       vwap: null,
       support: round(m1.slice(-20).reduce(function (lo, row) { return Math.min(lo, row.low); }, Infinity), 5),
       resistance: round(m1.slice(-20).reduce(function (hi, row) { return Math.max(hi, row.high); }, -Infinity), 5),
@@ -491,18 +409,13 @@
     };
 
     input._parts = { trend: trend, momentum: momentum, action: action, levels: levels, mtf: mtf, tradable: tradable };
-    var read = nextCandleRead(m1);
-    if (tradable < 40) {
-      blocks = [state === 'LOW_VOLATILITY' ? 'Слишком тихий рынок.' : 'Слишком рваный рынок.'];
-    } else if (!read) {
-      blocks = ['Следующая свеча этого таймфрейма не берётся: нет новой закрытой свечи с телом.'];
-    } else {
-      direction = read;
-      blocks = [];
-      if (read === 'UP') upScore = Math.max(upScore, 60);
-      else downScore = Math.max(downScore, 60);
-      score = Math.max(upScore, downScore);
+    var shift = socketShift(input.ticks, now);
+    if (shift && (!now || dataAge <= cfg.maxDataAgeMs)) {
+      var shiftScore = direction === shift.side ? Math.max(score, 64) : 64;
+      input._parts = { trend: trend, momentum: momentum, action: action, levels: levels, mtf: mtf, tradable: tradable, shift: shift.side };
+      return card(shift.side, shift.side === 'UP' ? shiftScore : upScore, shift.side === 'DOWN' ? shiftScore : downScore, state, 'Сдвиг последних тиков сокета ' + (shift.side === 'UP' ? 'вверх' : 'вниз') + '. Следующая минута в сторону этого сдвига.', dataAge, input, snapshot, null, shiftScore);
     }
+    input._parts = { trend: trend, momentum: momentum, action: action, levels: levels, mtf: mtf, tradable: tradable };
     if (blocks.length) return card('NO_TRADE', upScore, downScore, state, blocks.join(' '), dataAge, input, snapshot);
     var confirmed = {
       trend: (direction === 'UP' ? trend.up : trend.down) >= 55,
@@ -511,20 +424,18 @@
       priceAction: (direction === 'UP' ? action.up : action.down) >= 40,
       mtf: side5 === direction || side3 === direction
     };
-    var sideWord = direction === 'UP' ? 'вверх' : 'вниз';
-    return card(direction, upScore, downScore, state, 'Новая закрытая свеча ' + sideWord + '. Сигнал на следующую свечу этого таймфрейма.', dataAge, input, snapshot, confirmed, score);
+    return card(direction, upScore, downScore, state, 'Независимые подтверждения сошлись.', dataAge, input, snapshot, confirmed, score);
   }
 
   function card(direction, upScore, downScore, state, reason, dataAge, input, snapshot, confirmed, score) {
     var strength = direction === 'NO_TRADE' ? Math.max(upScore, downScore) : (score || Math.max(upScore, downScore));
     var label = strength >= 90 ? 'VERY STRONG' : (strength >= 80 ? 'STRONG' : (strength >= 70 ? 'MODERATE' : (strength >= 60 ? 'WEAK' : 'NO TRADE')));
     if (direction === 'NO_TRADE') label = 'NO TRADE';
-    var tfMin = Math.max(1, Number(input.tf) || 1);
     var lines = [
       'PAIR: ' + (input.pair || ''),
-      'TIMEFRAME: ' + tfMin + ' MIN',
+      'TIMEFRAME: 1 MIN',
       'SIGNAL: ' + (direction === 'UP' ? 'CALL / UP' : (direction === 'DOWN' ? 'PUT / DOWN' : 'NO TRADE')),
-      'EXPIRATION: ' + (tfMin * 60) + ' SEC',
+      'EXPIRATION: 60 SEC',
       'SIGNAL SCORE: ' + strength + '/100 ' + label,
       'MARKET STATE: ' + state,
       'REASON: ' + reason,
@@ -718,3 +629,4 @@
     resolveOutcome: resolveOutcome
   };
 });
+
