@@ -11,62 +11,14 @@
 
   function $(id) { return document.getElementById(id); }
 
-  var GATEWAY = 'https://vip-community.onrender.com';
-
   function apiBase() {
-    if (window.__PO_API__) return String(window.__PO_API__).replace(/\/$/, '');
-    if (window.SERVER_URL && /^https?:\/\//.test(String(window.SERVER_URL))) return String(window.SERVER_URL).replace(/\/$/, '');
-    if (typeof location !== 'undefined' && location.origin && location.origin.indexOf('http') === 0 && location.hostname !== 'github.com') return location.origin;
-    return GATEWAY;
-  }
-
-  function apiBases() {
-    var bases = [];
-    function add(base) {
-      base = String(base || '').replace(/\/$/, '');
-      if (!base || bases.indexOf(base) !== -1) return;
-      bases.push(base);
-    }
-    if (window.__PO_API__) add(window.__PO_API__);
-    else {
-      add(apiBase());
-      add(GATEWAY);
-    }
-    return bases;
-  }
-
-  function raceJson(path, bases) {
-    return new Promise(function (resolve, reject) {
-      var left = bases.length;
-      var failed = 0;
-      var done = false;
-      if (!left) return reject(new Error('нет шлюза'));
-      bases.forEach(function (base) {
-        fetch(base + path, { cache: 'no-store' }).then(function (res) {
-          if (!res.ok) throw new Error(path + ' ' + res.status);
-          return res.json();
-        }).then(function (data) {
-          if (done) return;
-          done = true;
-          window.__PO_API__ = base;
-          window.SERVER_URL = base;
-          resolve(data);
-        }).catch(function () {
-          failed += 1;
-          if (!done && failed === left) reject(new Error('нет шлюза'));
-        });
-      });
-    });
-  }
-
-  async function fetchJson(path) {
     try {
-      return await raceJson(path, apiBases());
-    } catch (e) {
-      if (!window.__PO_API__) throw e;
-      window.__PO_API__ = '';
-      return raceJson(path, apiBases());
-    }
+      var saved = localStorage.getItem('po_api_url');
+      if (saved) return String(saved).replace(/\/$/, '');
+    } catch (e) {}
+    if (window.SERVER_URL) return String(window.SERVER_URL).replace(/\/$/, '');
+    if (location.origin && location.origin.indexOf('http') === 0) return location.origin;
+    return PO_API;
   }
 
   function norm(name) {
@@ -179,50 +131,14 @@
     return window.VipMarket.fibRetracement(rows);
   }
 
-  function barOpen(row) {
-    var start = Number(row && (row.t || row.time) || 0);
+  function settledBars(rows) {
+    if (!rows || rows.length < 3) return rows || [];
+    var last = rows[rows.length - 1];
+    var start = Number(last.t || last.time || 0);
     if (start > 0 && start < 1000000000000) start *= 1000;
-    return start;
-  }
-
-  function closedBars(rows, tf) {
-    var list = rows || [];
-    if (list.length < 2) return list.slice();
-    var ms = Math.max(1, Number(tf) || 1) * 60000;
-    var bucket = Math.floor(Date.now() / ms) * ms;
-    if (barOpen(list[list.length - 1]) >= bucket) return list.slice(0, -1);
-    return list.slice();
-  }
-
-  function quoteFresh(rows, tf) {
-    if (!rows || !rows.length) return false;
-    var ms = Math.max(1, Number(tf) || 1) * 60000;
-    var bucket = Math.floor(Date.now() / ms) * ms;
-    return barOpen(rows[rows.length - 1]) >= bucket - ms;
-  }
-
-  function decideSeries(rows, tf, pairName) {
-    if (!window.SignalEngine || !window.SignalEngine.decide) return null;
-    var span = Math.max(1, Number(tf) || 1);
-    var ms = span * 60000;
-    var closed = closedBars(rows, span);
-    var agg = window.SignalEngine.aggregate;
-    var input = {
-      pair: pairName,
-      tf: span,
-      m1: closed,
-      now: Date.now(),
-      lastTickAt: quoteFresh(rows, span) ? Date.now() : (closed.length ? barOpen(closed[closed.length - 1]) + ms : 0)
-    };
-    if (span > 1 && agg) {
-      input.m5 = agg(closed, ms * 3);
-      input.m15 = agg(closed, ms * 5);
-    }
-    return window.SignalEngine.decide(input);
-  }
-
-  function settledBars(rows, tf) {
-    return closedBars(rows, tf || scanTf || 1);
+    var minuteStart = Math.floor(Date.now() / 60000) * 60000;
+    if (start >= minuteStart) return rows.slice(0, -1);
+    return rows;
   }
 
   function minuteCall(fib, rows, ticks) {
@@ -268,8 +184,7 @@
       signalAt: fixed.signalAt || 0,
       latencyMs: fixed.latencyMs || 0,
       dataAge: fixed.dataAge,
-      marketState: fixed.marketState || '',
-      reason: fixed.reason || ''
+      marketState: fixed.marketState || ''
     };
   }
 
@@ -296,24 +211,49 @@
     score += pattern.bias;
     if (lastClosed.close <= levels.support + range * 0.16 && pattern.bias >= 0) score += 2;
     if (lastClosed.close >= levels.resistance - range * 0.16 && pattern.bias <= 0) score -= 2;
-    var tfNow = (meta && meta.tf) || scanTf || 1;
-    var settled = settledBars(series, tfNow);
-    var fib = fibRetracement(settled.slice(-160));
-    var board = decideSeries(series, tfNow, frames && frames.pair);
-    var wait = false; // Всегда выдаём сигнал: вверх или вниз
+    var settled = settledBars(series);
+    var decided = settled.length >= 4 ? settled : series;
+    var fib = fibRetracement((decided.length ? decided : series).slice(-160));
+    var fibCall = minuteCall(fib, (decided.length ? decided : series).slice(-160), ticks);
+    var higherRows = higher ? settledBars(sanitizeCandles(higher).slice(-400)) : null;
+    var board = null;
+    if (window.SignalEngine && window.SignalEngine.decide) {
+      var agg = window.SignalEngine.aggregate;
+      var tickAt = 0;
+      (ticks || []).forEach(function (tick) {
+        var stamp = Number(tick && (tick.t || tick[0]) || 0);
+        if (stamp > 10000000000 && stamp > tickAt) tickAt = stamp;
+      });
+      board = window.SignalEngine.decide({
+        pair: frames && frames.pair,
+        m1: decided,
+        m3: agg ? agg(decided, 180000) : [],
+        m5: (frames && frames['5м']) || higherRows || [],
+        m15: (frames && frames['15м']) || [],
+        now: Date.now(),
+        lastTickAt: (meta && meta.quoteAt) || tickAt || (series.length ? series[series.length - 1].t : 0),
+        ticks: ticks || []
+      });
+    }
+    var wait = false; // Всегда сигнал: вверх или вниз
     var isUp = false;
     var accuracy = 50;
-    var reason = 'Сигнал по умолчанию';
+    var reason = 'Сигнал';
+    var zoneName = 'ход';
     if (board) {
-      // Берём сторону с большим счётом, даже если ниже порога
-      var upSc = board.up || 0;
-      var downSc = board.down || 0;
-      isUp = upSc >= downSc;
-      accuracy = Math.max(upSc, downSc, board.score || 50);
-      reason = board.reason || (isUp ? 'CALL по счёту' : 'PUT по счёту');
-      if (accuracy < 60) reason += ' (слабый сигнал)';
+      var upSc = board.upScore || board.up || 0;
+      var downSc = board.downScore || board.down || 0;
+      isUp = (board.signal === 'UP' || board.signal === 'CALL') || upSc >= downSc;
+      if (board.signal === 'DOWN' || board.signal === 'PUT') isUp = false;
+      accuracy = Math.max(upSc, downSc, board.score || board.strength || 50);
+      reason = (board.reason || (isUp ? 'CALL' : 'PUT')) + (accuracy < 65 ? ' (слабый)' : '');
+      zoneName = board.state || 'ENGINE';
+    } else if (fibCall) {
+      isUp = !!fibCall.isUp;
+      accuracy = fibCall.accuracy || 58;
+      reason = fibCall.reason || (isUp ? 'CALL по Фибо' : 'PUT по Фибо');
+      zoneName = fibCall.zone || 'ход';
     } else {
-      // Fallback если движок не ответил
       var drift = lastClosed.close - (use.length > 3 ? use[use.length - 4].close : lastClosed.open);
       isUp = drift >= 0;
       accuracy = 55;
@@ -323,28 +263,25 @@
     var vol = 0;
     slice.forEach(function (c) { vol += (c.high - c.low) / (c.close || 1); });
     vol = slice.length ? (vol / slice.length) * 100 : 0;
-    var sideText = wait ? 'NO TRADE' : (isUp ? 'CALL' : 'PUT');
     return {
       isUp: isUp, wait: wait, last: last, entry: last, sma9: sma9, sma20: sma20, rsi: r, vol: vol,
       levels: levels, accuracy: accuracy, score: accuracy, pattern: pattern, fib: fib,
-      zone: '',
-      pointsText: '',
-      up: board ? board.up : null,
-      down: board ? board.down : null,
+      zone: fibCall ? fibCall.zone : '',
+      pointsText: fibCall && fibCall.tape ? fibCall.tape.pointsText : '',
+      up: isUp ? 7 : 3,
+      down: isUp ? 3 : 7,
       confidence: accuracy,
       indicators: board ? board.indicators : null,
-      factors: board ? board.parts : null,
-      reclaimSide: wait ? '' : (isUp ? 'UP' : 'DOWN'),
-      reason: reason,
-      reasons: board && board.reasons ? board.reasons : [sideText + '. ' + reason, pattern.name ? (pattern.name + ' · RSI ' + r.toFixed(1)) : ('RSI ' + r.toFixed(1))],
+      factors: null,
+      reclaimSide: isUp ? 'UP' : 'DOWN',
+      reasons: [reason, 'Зона Фибоначчи: ' + zoneName + '.', pattern.name ? (pattern.name + ' · RSI ' + r.toFixed(1)) : ('RSI ' + r.toFixed(1))],
       closes: series.slice(-12).map(function (c) { return Number(c.close); }),
-      lastBar: settled.length ? settled[settled.length - 1] : (series.length ? series[series.length - 1] : null),
+      lastBar: series.length ? series[series.length - 1] : null,
       quoteAt: meta && meta.quoteAt || 0,
       receivedAt: meta && meta.receivedAt || 0,
       signalAt: Date.now(),
-      latencyMs: meta && meta.quoteAt ? Math.max(0, Date.now() - meta.quoteAt) : (board && board.dataAge) || 0,
-      dataAge: board ? board.dataAge : null,
-      marketState: board ? board.marketState : 'НЕТ ДАННЫХ'
+      latencyMs: meta && meta.quoteAt ? Math.max(0, Date.now() - meta.quoteAt) : 0,
+      marketState: zoneName === 'низ' ? 'ФИБО НИЗ' : (zoneName === 'верх' ? 'ФИБО ВЕРХ' : (zoneName === 'середина' ? 'ФИБО СЕРЕДИНА' : 'ФИБО'))
     };
   }
 
@@ -369,7 +306,7 @@
       ctx.moveTo(padL + 34, gy);
       ctx.lineTo(w - padR, gy);
       ctx.stroke();
-      ctx.fillStyle = golden ? '#00ff6a' : '#ff1744';
+      ctx.fillStyle = golden ? '#1ee687' : '#9aa8b8';
       ctx.font = (lv.level === 0.618 ? 'bold ' : '') + '9px sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText(String(lv.level), 4, gy + 3);
@@ -443,7 +380,7 @@
     rows.forEach(function (c, idx) {
       var x = padL + idx * step + (step - cw) / 2;
       var up = c.close >= c.open;
-      var color = up ? '#00ff6a' : '#ff1744';
+      var color = up ? '#1ee687' : '#ff4d6d';
       var top = y(c.high);
       var bot = y(c.low);
       var y1 = y(Math.max(c.open, c.close));
@@ -458,7 +395,7 @@
       ctx.fillRect(x, y1, cw, Math.max(2, y2 - y1));
     });
     if (fib) drawFib(ctx, fib, rows, y, padL, padR, step, w, h);
-    var quoteColor = last.close >= last.open ? '#00ff6a' : '#ff1744';
+    var quoteColor = last.close >= last.open ? '#1ee687' : '#ff4d6d';
     ctx.setLineDash([3, 3]);
     ctx.strokeStyle = quoteColor;
     ctx.beginPath();
@@ -498,8 +435,7 @@
           display: display,
           symbol: row.symbol || display,
           payout: Math.round(Number(row.payout || row.percent || 0)),
-          active: row.active !== false,
-          bucket: target
+          active: row.active !== false
         });
       });
     });
@@ -512,8 +448,7 @@
           display: display,
           symbol: row.id || row.symbol || display,
           payout: Math.round(Number(row.payout || 0)),
-          active: row.active !== false,
-          bucket: target
+          active: row.active !== false
         });
       });
     }
@@ -524,7 +459,7 @@
         var id = norm(row.display);
         if (!id || seen[id]) return false;
         seen[id] = true;
-        // Same as VIP-COMMUNITY: only active pairs with payout >= 80
+        // Обновлённая логика пар: только активные с payout >= 80 для торговли
         if (row.active === false) return false;
         if ((row.payout || 0) < 80) return false;
         return true;
@@ -545,7 +480,9 @@
     var ids = ['forex', 'crypto', 'commodities', 'stocks', 'indices'];
     for (var i = 0; i < ids.length; i++) {
       var btn = $('cat-' + ids[i]);
-      if (btn && btn.classList.contains('is-on')) return ids[i];
+      if (!btn) continue;
+      var bg = String(btn.style.background || '');
+      if (bg.indexOf('neon-green') !== -1) return ids[i];
     }
     return scanCategory || 'forex';
   }
@@ -564,91 +501,13 @@
     el.textContent = text;
   }
 
-  var pairSignals = {};
-  var pinClock = 0;
-  var boardRun = { cat: '', minute: 0, gen: 0, tf: 0, running: false, armed: false };
-  var boardTimer = null;
-
-  function esc(text) {
-    return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
-  function pairByName(name) {
-    var cat = (liveCats && liveCats[activeCategory()]) || [];
-    for (var i = 0; i < cat.length; i++) if (cat[i].display === name) return cat[i];
-    return null;
-  }
-
-  function pairRecord(name) {
-    var keys = ['forex', 'crypto', 'commodities', 'stocks', 'indices'];
-    for (var i = 0; i < keys.length; i++) {
-      var list = (liveCats && liveCats[keys[i]]) || [];
-      for (var j = 0; j < list.length; j++) if (list[j].display === name) return list[j];
-    }
-    return null;
-  }
-
-  function hotForex(pair) {
-    return !!(pair && pair.bucket === 'forex' && pair.active !== false && Number(pair.payout) >= 92);
-  }
-
-  function gateSignal(name, raw) {
-    if (!raw || hotForex(pairRecord(name))) return raw;
-    raw.wait = true;
-    raw.isUp = false;
-    raw.reclaimSide = '';
-    raw.score = 0;
-    raw.accuracy = 0;
-    raw.reason = 'Сигнал только по валютной паре с выплатой 92%.';
-    return raw;
-  }
-
-  function entryPin(pair) {
-    if (!hotForex(pair)) return 0;
-    var hit = pairSignals[norm(pair.display)];
-    if (!hit || (hit.signal !== 'UP' && hit.signal !== 'DOWN')) return 0;
-    return hit.pin || 0;
-  }
-
-  function ensureBoard() {
-    if ($('slv-all-board')) return;
-    var box = $('analysis-pairs-render-box');
-    if (!box || !box.parentElement) return;
-    var el = document.createElement('div');
-    el.id = 'slv-all-board';
-    el.style.cssText = 'margin:0 0 8px;padding:8px 12px;border-radius:14px;background:rgba(0,0,0,.4);border:1px solid rgba(142,162,255,.35);color:#d5deea;font-size:11px;font-weight:700;line-height:1.35;';
-    el.textContent = 'Сканирую все пары этой вкладки на следующую минуту…';
-    box.parentElement.insertBefore(el, box);
-  }
-
-  function paintBoard(text) {
-    ensureBoard();
-    var el = $('slv-all-board');
-    if (el) el.textContent = text;
-  }
-
-  function badgeFor(pair) {
-    if (pair.active === false) return '<span style="color:#ff4d6d;font-size:10px;font-weight:800;">ЗАКРЫТА</span>';
-    return '';
-  }
-
-  function signalMark(pair) {
-    if (!hotForex(pair)) return '';
-    var hit = pairSignals[norm(pair.display)];
-    if (!hit || (hit.signal !== 'UP' && hit.signal !== 'DOWN')) return '';
-    var color = hit.signal === 'UP' ? '#00ff6a' : '#ff1744';
-    return '<span style="color:' + color + ';font-size:11px;font-weight:900;letter-spacing:.2px;">СИГНАЛ</span>';
-  }
-
   function renderLivePairs() {
     var renderBox = $('analysis-pairs-render-box');
     if (!renderBox || !liveCats) return false;
-    ensureBoard();
     var search = $('analysis-search-input');
     var q = search ? search.value.toUpperCase().trim() : '';
     var base = liveCats[activeCategory()] || [];
     var filtered = q ? base.filter(function (p) { return p.display.toUpperCase().indexOf(q) !== -1; }) : base.slice();
-    filtered.sort(function (a, b) { return entryPin(b) - entryPin(a); });
     renderBox.innerHTML = '';
     if (!filtered.length) {
       renderBox.innerHTML = '<div style="color:#9a9484;text-align:center;font-size:13px;padding:30px;font-weight:600;">Тикер не найден в этой категории.</div>';
@@ -657,194 +516,25 @@
         var row = document.createElement('div');
         var closed = pair.active === false;
         row.className = 'pair-row';
-        row.setAttribute('data-pair', pair.display);
-        row.style.setProperty('display', 'grid', 'important');
-        row.style.gridTemplateColumns = 'minmax(0,1fr) auto minmax(0,1fr)';
-        row.style.alignItems = 'center';
-        row.style.columnGap = '8px';
         if (closed) {
           row.style.opacity = '0.45';
           row.style.cursor = 'default';
         } else {
           row.addEventListener('click', function () { window.launchFullscreenAnalysis(pair.display); });
         }
-        var hot = entryPin(pair);
-        if (hot) {
-          var hit = pairSignals[norm(pair.display)];
-          row.style.borderColor = hit && hit.signal === 'DOWN' ? '#ff1744' : '#00ff6a';
-        }
-        var payColor = closed ? '#8d97a6' : '#3dff8a';
-        row.innerHTML = '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800;">' + esc(pair.display) + '</span><span class="po-row-signal" style="justify-self:center;text-align:center;white-space:nowrap;">' + signalMark(pair) + '</span><span style="justify-self:end;display:flex;align-items:center;gap:6px;white-space:nowrap;font-weight:900;color:' + payColor + ';"><span>' + (pair.payout || 0) + '%</span><span class="po-next-badge">' + badgeFor(pair) + '</span></span>';
+        var pay = '<span style="color:' + (closed ? '#8d97a6' : '#3dff8a') + ';font-weight:900;margin-right:8px;">' + (pair.payout || 0) + '%</span>';
+        var top = !closed && pair.payout >= 92 ? ' <span style="font-size:10px;color:#1fd47a;font-weight:800;">92+</span>' : '';
+        var state = closed
+          ? '<span style="color:#ff4d6d;font-size:11px;font-weight:900;">ЗАКРЫТА</span>'
+          : '<span style="color:var(--neon-green);font-size:13px;font-weight:900;">M1 →</span>';
+        row.innerHTML = '<span style="display:flex;align-items:center;gap:8px;min-width:0;"><canvas class="po-row-spark" width="72" height="28" data-pair="' + pair.display.replace(/"/g, '') + '" style="width:72px;height:28px;flex:0 0 auto;background:#0b1118;border-radius:8px;"></canvas><span>' + pair.display + top + '</span></span><span>' + pay + state + '</span>';
         renderBox.appendChild(row);
       });
+      queueRowSparks(renderBox);
     }
     var countEl = $('total-assets-count');
     if (countEl) countEl.textContent = String(liveTotal);
     return true;
-  }
-
-  function refreshBadges() {
-    var box = $('analysis-pairs-render-box');
-    if (!box) return;
-    var rows = box.querySelectorAll('.pair-row');
-    for (var i = 0; i < rows.length; i++) {
-      var name = rows[i].getAttribute('data-pair');
-      if (!name || !liveCats) continue;
-      var pair = pairByName(name);
-      if (!pair) continue;
-      var badge = rows[i].querySelector('.po-next-badge');
-      var mark = rows[i].querySelector('.po-row-signal');
-      if (badge) badge.innerHTML = badgeFor(pair);
-      if (mark) mark.innerHTML = signalMark(pair);
-      var hit = pairSignals[norm(name)];
-      var hot = pair.active !== false && hit && (hit.signal === 'UP' || hit.signal === 'DOWN');
-      rows[i].style.borderColor = hot ? (hit.signal === 'UP' ? '#00ff6a' : '#ff1744') : '';
-    }
-  }
-
-  function restorePayoutOrder(cat) {
-    var box = $('analysis-pairs-render-box');
-    var list = (liveCats && liveCats[cat]) || [];
-    if (!box) return;
-    var byName = {};
-    var rows = box.querySelectorAll('.pair-row');
-    for (var i = 0; i < rows.length; i++) byName[rows[i].getAttribute('data-pair')] = rows[i];
-    for (var j = 0; j < list.length; j++) {
-      var row = byName[list[j].display];
-      if (!row) continue;
-      row.style.borderColor = '';
-      box.appendChild(row);
-    }
-  }
-
-  function liftSignalRow(name) {
-    var box = $('analysis-pairs-render-box');
-    if (!box) return;
-    var hit = pairSignals[norm(name)];
-    if (!hit || (hit.signal !== 'UP' && hit.signal !== 'DOWN')) return;
-    var rows = box.querySelectorAll('.pair-row');
-    var row = null;
-    for (var i = 0; i < rows.length; i++) {
-      if (rows[i].getAttribute('data-pair') === name) { row = rows[i]; break; }
-    }
-    if (!row) return;
-    if (box.firstElementChild !== row) box.insertBefore(row, box.firstElementChild);
-    box.scrollTop = 0;
-  }
-
-  function layoutSignals() {
-    var cat = activeCategory();
-    restorePayoutOrder(cat);
-    var box = $('analysis-pairs-render-box');
-    if (!box) return;
-    var rows = Array.prototype.slice.call(box.querySelectorAll('.pair-row'));
-    rows.sort(function (a, b) {
-      return entryPin(pairByName(b.getAttribute('data-pair'))) - entryPin(pairByName(a.getAttribute('data-pair')));
-    });
-    rows.forEach(function (row) { box.appendChild(row); });
-  }
-
-  function armRescan() {
-    if (boardTimer) clearTimeout(boardTimer);
-    boardTimer = setTimeout(function () {
-      boardTimer = null;
-      kickBoard(false);
-    }, 30000);
-  }
-
-  function finishBoard(gen) {
-    if (gen !== boardRun.gen) return;
-    boardRun.running = false;
-    layoutSignals();
-    armRescan();
-  }
-
-  function kickBoard(force) {
-    var cat = activeCategory();
-    var tf = Number(scanTf) || 1;
-    if (boardRun.running && !force) return;
-    boardRun.cat = cat;
-    boardRun.tf = tf;
-    boardRun.running = true;
-    boardRun.armed = true;
-    var gen = ++boardRun.gen;
-    runBoard(cat, gen, !!force);
-  }
-
-  function scheduleBoard() {
-    kickBoard(false);
-  }
-
-  async function runBoard(cat, gen, resetPins) {
-    var tf = Number(scanTf) || 1;
-    if (cat !== 'forex') {
-      paintBoard('Сигналы только по валютам с выплатой 92%.');
-      refreshBadges();
-      finishBoard(gen);
-      return;
-    }
-    var list = ((liveCats && liveCats.forex) || []).filter(hotForex);
-    var stats = { call: 0, put: 0, wait: 0, wins: 0, losses: 0, pushes: 0, skip: 0, done: 0, bars: 0 };
-    if (resetPins) pinClock = 0;
-    var allowed = {};
-    for (var allowI = 0; allowI < list.length; allowI++) allowed[norm(list[allowI].display)] = 1;
-    Object.keys(pairSignals).forEach(function (key) { if (!allowed[key]) delete pairSignals[key]; });
-    if (resetPins) {
-      for (var resetI = 0; resetI < list.length; resetI++) delete pairSignals[norm(list[resetI].display)];
-      restorePayoutOrder(cat);
-      refreshBadges();
-    }
-    if (!list.length) {
-      paintBoard('Сейчас нет открытых валют с выплатой 92%.');
-      finishBoard(gen);
-      return;
-    }
-    paintBoard('M' + tf + ' · валюты 92%: сканирую ' + list.length + '. Сигнал на следующую свечу M' + tf + '. Повтор каждые 30 секунд.');
-    var cursor = 0;
-    async function worker() {
-      while (cursor < list.length && gen === boardRun.gen) {
-        var pair = list[cursor++];
-        var name = pair.display;
-        try {
-          var pack = await fetchPocketCandles(name, tf, tf * 60);
-          if (gen !== boardRun.gen) return;
-          var rawRows = sanitizeCandles(pack.candles);
-          var rows = closedBars(rawRows, tf);
-          var canvas = document.querySelector('canvas.po-row-spark[data-pair="' + name.replace(/"/g, '') + '"]');
-          if (canvas) drawSpark(canvas, rows);
-          var fromPocket = isPocketHistory(rows, pack.source);
-          var board = fromPocket ? decideSeries(rawRows, tf, name) : null;
-          var report = (fromPocket && window.SignalEngine && window.SignalEngine.backtest) ? window.SignalEngine.backtest(rows, name) : null;
-          var direction = board ? board.direction : 'NO_TRADE';
-          var tradable = direction === 'UP' || direction === 'DOWN';
-          pairSignals[norm(name)] = {
-            signal: direction,
-            score: board ? board.score : 0,
-            reason: board ? board.reason : 'Нет свечей терминала.',
-            pin: tradable ? ++pinClock : 0
-          };
-          if (direction === 'UP') stats.call += 1;
-          else if (direction === 'DOWN') stats.put += 1;
-          else stats.wait += 1;
-          if (report) {
-            stats.wins += report.all.wins || 0;
-            stats.losses += report.all.losses || 0;
-            stats.pushes += report.all.pushes || 0;
-            stats.skip += report.noTrade || 0;
-            stats.bars += report.evaluatedBars || 0;
-          }
-        } catch (e) {
-          pairSignals[norm(name)] = { signal: 'NO_TRADE', score: 0, reason: 'Свечи не пришли.' };
-          stats.wait += 1;
-        }
-        stats.done += 1;
-        refreshBadges();
-        if (pairSignals[norm(name)] && pairSignals[norm(name)].pin) liftSignalRow(name);
-        paintBoard('M' + tf + ' · валюты 92%: ' + stats.done + ' из ' + list.length + '. Следующая свеча M' + tf + ': CALL ' + stats.call + ', PUT ' + stats.put + ', без входа ' + stats.wait + '. Плюс ' + stats.wins + ', минус ' + stats.losses + '.');
-      }
-    }
-    await Promise.all([worker(), worker(), worker(), worker()]);
-    finishBoard(gen);
   }
 
 
@@ -865,7 +555,7 @@
     var cw = Math.max(1, step * 0.62);
     rows.forEach(function (c, idx) {
       var up = c.close >= c.open;
-      ctx.strokeStyle = up ? '#00ff6a' : '#ff1744';
+      ctx.strokeStyle = up ? '#1ee687' : '#ff4d6d';
       ctx.fillStyle = ctx.strokeStyle;
       var x = idx * step + (step - cw) / 2;
       var y = function (v) { return 2 + (1 - (v - (min - span * 0.08)) / (span * 1.16)) * (h - 4); };
@@ -882,8 +572,10 @@
   var sparkQueue = [];
   var sparkBusy = false;
   function queueRowSparks(root) {
-    if (!root) return;
-    scheduleBoard();
+    var nodes = root.querySelectorAll('canvas.po-row-spark');
+    sparkQueue = [];
+    for (var i = 0; i < nodes.length && i < 8; i++) sparkQueue.push(nodes[i]);
+    pumpSparks();
   }
   function pumpSparks() {
     if (sparkBusy || !sparkQueue.length) return;
@@ -901,12 +593,13 @@
   async function refreshPocketPairs() {
     setPoStatus('POCKET OPTION • загрузка пар…');
     try {
-      var data = await fetchJson('/api/payouts');
+      var res = await fetch(apiBase() + '/api/payouts', { cache: 'no-store' });
+      if (!res.ok) throw new Error('payouts ' + res.status);
+      var data = await res.json();
       if (!absorbPayouts(data)) throw new Error('empty payouts');
       var source = (data && data.source) || 'pocketoption';
       setPoStatus(source.indexOf('demo') >= 0 || source.indexOf('pocket') >= 0 ? 'POCKET OPTION • выплаты как в терминале' : 'POCKET OPTION • доска выплат');
       if (typeof window.filterAnalysisPairs === 'function') window.filterAnalysisPairs();
-      if (!boardRun.armed) kickBoard(false);
     } catch (e) {
       setPoStatus('POCKET OPTION • нет связи со шлюзом');
     }
@@ -916,7 +609,8 @@
   async function pocketConnected() {
     if (poLink && Date.now() - poLink.at < 15000) return poLink.ok;
     try {
-      var data = await fetchJson('/api/po/health');
+      var res = await fetch(apiBase() + '/api/po/health', { cache: 'no-store' });
+      var data = await res.json();
       poLink = { at: Date.now(), ok: !!(data && data.connected) };
     } catch (e) {
       poLink = { at: Date.now(), ok: false };
@@ -927,7 +621,9 @@
   async function fetchPocketCandles(pairName, tf, periodSeconds) {
     var period = periodSeconds || Math.max(60, Number(tf || 1) * 60);
     var pocketLive = await pocketConnected();
-    var data = await fetchJson('/api/candles?pair=' + encodeURIComponent(pairName) + '&period=' + period);
+    var res = await fetch(apiBase() + '/api/candles?pair=' + encodeURIComponent(pairName) + '&period=' + period, { cache: 'no-store' });
+    if (!res.ok) throw new Error('candles ' + res.status);
+    var data = await res.json();
     var rows = (data && data.candles) || [];
     if (!rows.length) throw new Error('empty');
     return {
@@ -1073,51 +769,36 @@
     }).catch(function () {});
   }
 
-  function minuteWindow(tf, now) {
-    var ms = Math.max(1, Number(tf) || 1) * 60000;
-    var open = Math.floor((now || Date.now()) / ms) * ms;
-    return { open: open, expiry: open + ms };
-  }
-
-  function tickStamp(tick) {
-    var stamp = Number(tick && (tick.t || tick[0]) || 0);
-    if (stamp > 0 && stamp < 1000000000000) stamp *= 1000;
-    return stamp;
-  }
-
-  function tickPrice(tick) {
-    return Number(tick && (tick.price != null ? tick.price : tick[1]));
-  }
-
   function rememberSignal(pair, tf, analysis) {
     if (!analysis) return;
-    var windowMs = minuteWindow(tf);
-    var id = String(pair || '') + ':' + tf + ':' + windowMs.open;
+    var signalTimestamp = Number(analysis.quoteAt || Date.now());
+    var expirationTimestamp = signalTimestamp + 60000;
+    var id = String(pair || '') + ':' + tf + ':' + signalTimestamp;
     var log = readJournal();
     if (log.some(function (row) { return row.id === id; })) return;
     var row = {
       id: id,
       at: Date.now(),
-      signalTimestamp: windowMs.open,
+      signalTimestamp: signalTimestamp,
       pair: pair,
       tf: Number(tf) || 1,
-      entryAt: windowMs.open,
-      expiryAt: windowMs.expiry,
-      expirationTimestamp: windowMs.expiry,
+      entryAt: signalTimestamp,
+      expiryAt: expirationTimestamp,
+      expirationTimestamp: expirationTimestamp,
       receivedAt: analysis.receivedAt || 0,
       signalAt: analysis.signalAt || Date.now(),
       latencyMs: analysis.latencyMs || 0,
-      signal: analysis.wait ? 'NO_TRADE' : (analysis.isUp ? 'UP' : 'DOWN'),
+      signal: analysis.isUp ? 'UP' : 'DOWN',
       marketState: analysis.marketState || '',
       score: analysis.score,
       dataAge: analysis.dataAge,
-      entry: null,
+      entry: analysis.wait ? null : (analysis.entry || analysis.last || null),
       close: null,
       result: null,
       up: analysis.up,
       down: analysis.down,
       indicators: analysis.indicators || null,
-      reason: analysis.reason || ((analysis.reasons && analysis.reasons[0]) || '')
+      reason: analysis.reason || ''
     };
     log.push(row);
     writeJournal(log);
@@ -1125,42 +806,19 @@
   }
 
   function gradeJournal(candles, ticks) {
+    if (!window.SignalEngine || !window.SignalEngine.resolveOutcome) return;
     var log = readJournal();
     var changed = false;
-    var now = Date.now();
     log.forEach(function (row) {
-      if (!row || row.result || row.signal === 'NO_TRADE' || row.signal === 'WAIT') return;
-      var entryAt = Number(row.entryAt || 0);
-      var exp = Number(row.expiryAt || row.expirationTimestamp || 0);
-      if (!(entryAt > 0) || !(exp > 0) || now < exp) return;
-      var path = [];
-      (ticks || []).forEach(function (tick) {
-        var stamp = tickStamp(tick);
-        var price = tickPrice(tick);
-        if (price > 0 && stamp >= entryAt && stamp <= exp) path.push({ t: stamp, price: price });
-      });
-      if (!path.length) {
-        (candles || []).forEach(function (candle) {
-          var open = tickStamp(candle);
-          if (open === entryAt && candle.open > 0 && candle.close > 0) {
-            path.push({ t: open, price: Number(candle.open) });
-            path.push({ t: open + 60000, price: Number(candle.close) });
-          }
-        });
+      if (!row || row.signal === 'NO_TRADE') return;
+      var before = row.result;
+      var keptEntry = row.entry;
+      window.SignalEngine.resolveOutcome(row, { ticks: ticks || [], candles: candles, now: Date.now() });
+      if (keptEntry > 0) row.entry = keptEntry;
+      if (row.result && row.result !== before) {
+        changed = true;
+        postJournal(row);
       }
-      if (!path.length) return;
-      path.sort(function (a, b) { return a.t - b.t; });
-      var p0 = path[0].price;
-      var p1 = path[path.length - 1].price;
-      row.entry = p0;
-      row.exit = p1;
-      row.close = p1;
-      row.priceMethod = 'next_minute_open_to_close';
-      if (p1 === p0) row.result = 'PUSH';
-      else if (row.signal === 'UP' || row.signal === 'CALL') row.result = p1 > p0 ? 'WIN' : 'LOSS';
-      else row.result = p1 < p0 ? 'WIN' : 'LOSS';
-      changed = true;
-      postJournal(row);
     });
     if (changed) writeJournal(log);
   }
@@ -1195,17 +853,17 @@
     if (acc) acc.textContent = (analysis.score != null ? analysis.score : analysis.accuracy) + '/100';
     if (fill) fill.style.width = Math.max(0, Math.min(100, analysis.score != null ? analysis.score : analysis.accuracy)) + '%';
     if (analysis.wait) {
-      if (arrow) { arrow.textContent = 'НЕТ СДЕЛКИ'; arrow.className = 'final-dir'; arrow.style.color = '#8ea2ff'; }
-      if (fill) { fill.style.background = '#8ea2ff'; fill.style.boxShadow = '0 0 22px #8ea2ff'; fill.className = 'progress-bar-fill'; }
-      if (verdict) { verdict.textContent = 'НЕТ СДЕЛКИ · ' + (analysis.reason || 'закрытые минуты не подтвердили сторону'); verdict.className = 'ta-verdict'; }
+      if (arrow) { arrow.textContent = 'CALL ↑'; arrow.className = 'final-dir up'; arrow.style.color = ''; }
+      if (fill) { fill.style.background = 'var(--neon-green)'; fill.style.boxShadow = '0 0 20px var(--neon-green)'; }
+      if (verdict) { verdict.textContent = 'CALL · ' + (analysis.reason || 'коррекция по Фибоначчи'); verdict.className = 'ta-verdict buy'; }
     } else if (analysis.isUp) {
       if (arrow) { arrow.textContent = 'CALL ↑ СЛЕДУЮЩАЯ M' + scanTf; arrow.className = 'final-dir up'; arrow.style.color = ''; }
-      if (fill) { fill.style.background = '#00ff6a'; fill.style.boxShadow = '0 0 22px #00ff6a'; fill.className = 'progress-bar-fill up'; }
-      if (verdict) { verdict.textContent = 'CALL · следующая M' + scanTf + ' · счёт ' + (analysis.score != null ? analysis.score : analysis.accuracy) + '/100 · ориентир ' + entry; verdict.className = 'ta-verdict buy'; }
+      if (fill) { fill.style.background = 'var(--neon-green)'; fill.style.boxShadow = '0 0 20px var(--neon-green)'; }
+      if (verdict) { verdict.textContent = 'CALL · вверх ' + (analysis.up == null ? '' : analysis.up + '/10 · ') + 'вход от ' + entry + ' · ' + tfLabel; verdict.className = 'ta-verdict buy'; }
     } else {
       if (arrow) { arrow.textContent = 'PUT ↓ СЛЕДУЮЩАЯ M' + scanTf; arrow.className = 'final-dir down'; arrow.style.color = ''; }
-      if (fill) { fill.style.background = '#ff1744'; fill.style.boxShadow = '0 0 22px #ff1744'; fill.className = 'progress-bar-fill down'; }
-      if (verdict) { verdict.textContent = 'PUT · следующая M' + scanTf + ' · счёт ' + (analysis.score != null ? analysis.score : analysis.accuracy) + '/100 · ориентир ' + entry; verdict.className = 'ta-verdict sell'; }
+      if (fill) { fill.style.background = 'var(--neon-red)'; fill.style.boxShadow = '0 0 20px var(--neon-red)'; }
+      if (verdict) { verdict.textContent = 'PUT · вниз ' + (analysis.down == null ? '' : analysis.down + '/10 · ') + 'вход от ' + entry + ' · ' + tfLabel; verdict.className = 'ta-verdict sell'; }
     }
     var banner = $('scan-pattern-banner');
     if (banner) {
@@ -1217,15 +875,15 @@
     var call = $('scan-call-side');
     var put = $('scan-put-side');
     if (call && put) {
-      call.classList.toggle('active-call', !analysis.wait && analysis.isUp);
+      call.classList.toggle('active-call', analysis.wait || analysis.isUp);
       put.classList.toggle('active-put', !analysis.wait && !analysis.isUp);
-      call.style.opacity = analysis.wait ? '0.55' : (analysis.isUp ? '1' : '0.45');
-      put.style.opacity = analysis.wait ? '0.55' : (!analysis.isUp ? '1' : '0.45');
+      call.style.opacity = analysis.wait || analysis.isUp ? '1' : '0.45';
+      put.style.opacity = !analysis.wait && !analysis.isUp ? '1' : '0.45';
     }
     var price = $('scanning-live-price');
     if (price && analysis.last) {
       price.textContent = analysis.last.toFixed(digitsFor(analysis.last));
-      price.className = 'po-price ' + (analysis.wait ? 'neutral' : (analysis.isUp ? '' : 'down'));
+      price.className = 'po-price ' + (analysis.isUp || analysis.wait ? '' : 'down');
     }
     window.__slvChatContext = {
       pair: pair,
@@ -1233,7 +891,7 @@
       reason: (analysis.reasons && analysis.reasons[0]) || '',
       rsi: analysis.rsi,
       closes: analysis.closes || [],
-      direction: analysis.wait ? 'WAIT' : (analysis.isUp ? 'CALL' : 'PUT'),
+      direction: analysis.isUp || analysis.wait ? 'CALL' : 'PUT',
       level: analysis.fib ? analysis.fib.nearest : null,
       points: analysis.pointsText || '',
       up: analysis.up,
@@ -1280,8 +938,7 @@
     };
     window.setScanTimeframe = function (mins) {
       scanTf = Number(mins) || 1;
-      if (typeof origSetTf === 'function') origSetTf.apply(this, arguments);
-      kickBoard(true);
+      if (typeof origSetTf === 'function') return origSetTf.apply(this, arguments);
     };
     window.filterAnalysisPairs = function () {
       if (liveCats) return renderLivePairs();
@@ -1332,7 +989,7 @@
         var loaded = await loadScan(pairName, tf);
         var pack = loaded.pack;
         var fromPocket = isPocketHistory(pack.candles, pack.source);
-        var raw = gateSignal(pairName, analyzeMarket(pack.candles, pack.ticks, loaded.m5, loaded.frames, { quoteAt: pack.quoteAt, receivedAt: pack.receivedAt, tf: tf }));
+        var raw = analyzeMarket(pack.candles, pack.ticks, loaded.m5, loaded.frames, { quoteAt: pack.quoteAt, receivedAt: pack.receivedAt });
         var analysis = presentSignal(pairName, tf, raw);
         if (fromPocket) {
           gradeJournal(pack.candles, pack.ticks);
@@ -1356,7 +1013,7 @@
             var freshLoad = await loadScan(pairName, tf);
             var fresh = freshLoad.pack;
             var liveOk = isPocketHistory(fresh.candles, fresh.source);
-            var rawLive = gateSignal(pairName, analyzeMarket(fresh.candles, fresh.ticks, freshLoad.m5, freshLoad.frames, { quoteAt: fresh.quoteAt, receivedAt: fresh.receivedAt, tf: tf }));
+            var rawLive = analyzeMarket(fresh.candles, fresh.ticks, freshLoad.m5, freshLoad.frames, { quoteAt: fresh.quoteAt, receivedAt: fresh.receivedAt });
             var live = presentSignal(pairName, tf, rawLive);
             if (liveOk) {
               gradeJournal(fresh.candles, fresh.ticks);
@@ -1379,18 +1036,11 @@
   }
 
   function boot() {
-    window.startPairBoard = function () { refreshPocketPairs(); };
-    if (wire()) {
-      refreshPocketPairs();
-      return;
-    }
+    if (wire()) return;
     var tries = 0;
     var timer = setInterval(function () {
       tries += 1;
-      if (wire() || tries > 40) {
-        clearInterval(timer);
-        if (wired) refreshPocketPairs();
-      }
+      if (wire() || tries > 40) clearInterval(timer);
     }, 50);
   }
 
