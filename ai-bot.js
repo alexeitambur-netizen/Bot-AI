@@ -189,6 +189,32 @@
     return tf ? tf.label : (selectedTf + ' сек');
   }
 
+  function analyzeTicks(candles) {
+    if (!candles || candles.length < 4) return { isDown: Math.random() > 0.5, reason: 'Мало данных' };
+    var recent = candles.slice(-8);
+    var closes = recent.map(function (c) { return c.close; });
+    var last = closes[closes.length - 1];
+    var prev = closes[closes.length - 2];
+    var prev3 = closes[Math.max(0, closes.length - 4)];
+    var bearish = 0, bullish = 0;
+    recent.slice(-5).forEach(function (c) {
+      if (c.close < c.open) bearish++;
+      else if (c.close > c.open) bullish++;
+    });
+    var sma = closes.reduce(function (a, b) { return a + b; }, 0) / closes.length;
+    var momentum = last - prev3;
+    var score = 0;
+    if (last < prev) score -= 1; else score += 1;
+    if (momentum < 0) score -= 1; else score += 1;
+    if (last < sma) score -= 1; else score += 1;
+    if (bearish > bullish) score -= 1;
+    if (bullish > bearish) score += 1;
+    var isDown = score < 0;
+    if (score === 0) isDown = last < prev;
+    var reason = (isDown ? 'Импульс вниз' : 'Импульс вверх') + ' · ' + bearish + '↓/' + bullish + '↑';
+    return { isDown: isDown, reason: reason };
+  }
+
   function createViz(container, type) {
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 100 36');
@@ -269,7 +295,7 @@
       for (var b = 0; b < 10; b++) {
         var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', 3 + b * 9.6);
-        rect.setAttribute('width', 6);
+        rect.setAttribute('width', 6');
         rect.setAttribute('rx', '2');
         rect.setAttribute('fill', '#a855f7');
         rect.setAttribute('opacity', '0.9');
@@ -399,21 +425,9 @@
       var candlesRes = await fetch('/api/candles?pair=' + encodeURIComponent(selectedPair) + '&period=' + selectedTf);
       var candleData = await candlesRes.json();
       var candles = candleData.candles || [];
-      var decision = null;
-      if (window.SignalEngine && candles.length >= 10) {
-        decision = SignalEngine.decide({
-          pair: selectedPair, m1: candles, now: Date.now(),
-          lastTickAt: candles.length ? candles[candles.length - 1].t : Date.now()
-        });
-      }
-      var isDown = true;
-      var reason = 'Анализ завершён';
-      if (decision && decision.direction) {
-        isDown = decision.direction === 'DOWN';
-        reason = decision.reason || reason;
-      } else if (candles.length >= 3) {
-        isDown = candles[candles.length - 1].close < candles[candles.length - 3].close;
-      }
+      var result = analyzeTicks(candles);
+      var isDown = result.isDown;
+      var reason = result.reason;
       var chartColor = isDown ? '#f43f5e' : '#22d3a0';
       indicators.forEach(function (ind) {
         var el = $('ind-' + ind.key);
