@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>AI Bot — Chat GPT Trade Bot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/ai-bot-3d.css?v=17">
+  <link rel="stylesheet" href="/ai-bot-3d.css?v=18">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     body {
@@ -95,14 +95,19 @@
       box-shadow: 0 6px 20px rgba(25,229,139,0.4);
     }
     .get-signal:disabled { opacity: 0.5; }
+    .analysis-panel {
+      background: rgba(10, 20, 40, 0.92) !important;
+      border: 2px solid #36d8f2 !important;
+      box-shadow: 0 0 30px rgba(54,216,242,0.4), inset 0 0 20px rgba(54,216,242,0.08) !important;
+      border-radius: 20px;
+    }
     .analysis-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
     .spinner {
       width: 48px; height: 48px; border-radius: 50%;
-      background: conic-gradient(from 0deg, #19e58b, #36d8f2, #19e58b);
+      border: 3px solid rgba(54,216,242,0.3);
+      border-top-color: #36d8f2;
       animation: spin 1s linear infinite;
-      mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
-      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
-      filter: drop-shadow(0 0 8px #36d8f2);
+      box-shadow: 0 0 12px #36d8f2;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     .analysis-title { font-weight: 800; font-size: 17px; color: #fff; }
@@ -112,26 +117,41 @@
     }
     .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .indicator {
-      background: rgba(30, 55, 85, 0.85);
-      border: 1.5px solid rgba(54,216,242,0.45);
-      border-radius: 16px;
+      background: rgba(8, 16, 32, 0.9);
+      border: 1.5px solid;
+      border-radius: 14px;
       padding: 10px;
-      min-height: 96px;
+      min-height: 100px;
       opacity: 0; transform: translateY(8px);
       transition: all 0.35s ease;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
     }
     .indicator.show { opacity: 1; transform: translateY(0); }
-    .indicator .label { font-size: 10px; color: #a8c5d9; }
-    .indicator .value { font-weight: 800; font-size: 14px; margin: 4px 0; color: #fff; }
-    .chart-wrap { margin-top: 6px; height: 36px; }
+    .indicator .label { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+    .indicator .value { font-weight: 800; font-size: 13px; margin: 2px 0 4px; }
+    .chart-wrap { margin-top: 4px; height: 48px; display: flex; align-items: center; justify-content: center; }
+    .indicator.trend { border-color: #ff9a3c; box-shadow: 0 0 14px rgba(255,154,60,0.35); }
+    .indicator.trend .label { color: #ff9a3c; }
+    .indicator.support { border-color: #c46bff; box-shadow: 0 0 14px rgba(196,107,255,0.35); }
+    .indicator.support .label { color: #c46bff; }
+    .indicator.move { border-color: #ff5ec7; box-shadow: 0 0 14px rgba(255,94,199,0.35); }
+    .indicator.move .label { color: #ff5ec7; }
+    .indicator.impulse { border-color: #39ff6a; box-shadow: 0 0 14px rgba(57,255,106,0.35); }
+    .indicator.impulse .label { color: #39ff6a; }
+    .indicator.session { border-color: #36d8f2; box-shadow: 0 0 14px rgba(54,216,242,0.35); }
+    .indicator.session .label { color: #36d8f2; }
+    .indicator.ma { border-color: #ff5a5a; box-shadow: 0 0 14px rgba(255,90,90,0.35); }
+    .indicator.ma .label { color: #ff5a5a; }
+    .indicator.rsi { border-color: #ffe14a; box-shadow: 0 0 14px rgba(255,225,74,0.35); }
+    .indicator.rsi .label { color: #ffe14a; }
+    .indicator.vol { border-color: #4ad4ff; box-shadow: 0 0 14px rgba(74,212,255,0.35); }
+    .indicator.vol .label { color: #4ad4ff; }
     .progress {
-      height: 5px; background: rgba(54,216,242,0.15); border-radius: 3px; margin: 12px 0 6px; overflow: hidden;
+      height: 4px; background: rgba(54,216,242,0.15); border-radius: 3px; margin: 14px 0 6px; overflow: hidden;
     }
     .progress > div {
-      height: 100%; background: linear-gradient(90deg, #19e58b, #36d8f2);
+      height: 100%; background: linear-gradient(90deg, #36d8f2, #19e58b);
       width: 0%; transition: width 0.35s;
-      box-shadow: 0 0 8px #19e58b;
+      box-shadow: 0 0 8px #36d8f2;
     }
     .bottom-status { text-align: center; font-size: 12px; color: #a8c5d9; }
     .signal-overlay, .tf-overlay {
@@ -239,7 +259,7 @@
       </div>
     </div>
     <div id="analysisView" style="display:none">
-      <div class="ai3d-panel">
+      <div class="ai3d-panel analysis-panel">
         <div class="analysis-top">
           <div class="spinner"></div>
           <div>
@@ -281,7 +301,7 @@
   <div id="signalOverlay" class="signal-overlay hidden">
     <div id="signalCard"></div>
   </div>
-  <script src="/signal-engine.js?v=17"></script>
-  <script src="/ai-bot.js?v=17"></script>
+  <script src="/signal-engine.js?v=18"></script>
+  <script src="/ai-bot.js?v=18"></script>
 </body>
 </html>
