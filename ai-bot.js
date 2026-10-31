@@ -32,6 +32,7 @@
   var searchQuery = '';
   var chartAnimators = [];
   var lastEntryPrice = null;
+  var countdownTimer = null;
 
   function $(id) { return document.getElementById(id); }
 
@@ -201,6 +202,14 @@
     return tf ? tf.label : (selectedTf + ' сек');
   }
 
+  function nextCandleOpenMs() {
+    var now = Date.now();
+    var tfMs = selectedTf * 1000;
+    var next = Math.ceil(now / tfMs) * tfMs;
+    if (next - now < 500) next += tfMs;
+    return next;
+  }
+
   function analyzeTicks(candles) {
     if (!candles || candles.length < 3) {
       return { isDown: Math.random() > 0.5, reason: 'Анализ по тикам', entry: null };
@@ -360,6 +369,7 @@
 
   async function getSignal() {
     if (!checkAccess()) return;
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
     chartAnimators.forEach(function (s) { if (typeof s === 'function') s(); });
     chartAnimators = [];
     var btn = $('getSignalBtn');
@@ -454,6 +464,12 @@
     if (btn) btn.disabled = false;
   }
 
+  function closeSignal() {
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+    var overlay = $('signalOverlay');
+    if (overlay) overlay.classList.add('hidden');
+  }
+
   function showResult(isDown, reason, entryPrice) {
     chartAnimators.forEach(function (s) { if (typeof s === 'function') s(); });
     chartAnimators = [];
@@ -473,36 +489,49 @@
     var pairName = allPairs.find(function (p) { return p.symbol === selectedPair; });
     var pairLabel = pairName ? pairName.display : selectedPair;
     var priceStr = entryPrice ? entryPrice.toFixed(5).replace(/\.?0+$/, '') : '—';
+    var nextOpen = nextCandleOpenMs();
 
     card.innerHTML =
-      '<div class="big-signal ' + cls + '">' +
+      '<div class="big-signal ' + cls + '" style="position:relative">' +
+        '<button id="closeBtn" style="position:absolute;top:8px;right:10px;background:none;border:none;color:#a8c5d9;font-size:22px;cursor:pointer;line-height:1">×</button>' +
         '<div class="signal-icon ' + cls + '">' + icon + '</div>' +
         '<div style="font-size:12px;color:#a8c5d9;margin-bottom:6px">' + pairLabel + '</div>' +
         '<div class="direction">' + dir + '</div>' +
         '<div class="entry-price">Вход: ' + priceStr + '</div>' +
-        '<div style="margin-top:6px;font-size:13px">Откройте «' + dir + '» на ' + tfName + '</div>' +
-        '<div class="countdown" id="cd">Войдите за 0:' + String(Math.min(selectedTf, 59)).padStart(2, '0') + '</div>' +
+        '<div style="margin-top:6px;font-size:13px">Следующая свеча · ' + tfName + '</div>' +
+        '<div class="countdown" id="cd">До открытия: ...</div>' +
         '<div style="margin-top:10px;font-size:11px;color:#a8c5d9">' + (reason || '') + '</div>' +
         '<button class="rescan-btn" id="rescanBtn">Сканировать снова</button>' +
       '</div>';
 
     overlay.classList.remove('hidden');
 
+    var closeBtn = $('closeBtn');
+    if (closeBtn) closeBtn.addEventListener('click', closeSignal);
+
     var rescan = $('rescanBtn');
     if (rescan) {
       rescan.addEventListener('click', function () {
-        overlay.classList.add('hidden');
+        closeSignal();
         getSignal();
       });
     }
 
-    var left = Math.min(selectedTf, 59);
     var cd = $('cd');
-    var timer = setInterval(function () {
-      left--;
-      if (left <= 0) { clearInterval(timer); if (cd) cd.textContent = 'Сделка завершена'; return; }
-      if (cd) cd.textContent = 'Войдите за 0:' + String(left).padStart(2, '0');
-    }, 1000);
+    function tick() {
+      var left = Math.max(0, Math.round((nextOpen - Date.now()) / 1000));
+      if (left <= 0) {
+        if (cd) cd.textContent = 'Свеча открыта';
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+        return;
+      }
+      var m = Math.floor(left / 60);
+      var s = left % 60;
+      if (cd) cd.textContent = 'До открытия: ' + (m > 0 ? m + ':' + String(s).padStart(2, '0') : '0:' + String(s).padStart(2, '0'));
+    }
+    tick();
+    countdownTimer = setInterval(tick, 250);
   }
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
