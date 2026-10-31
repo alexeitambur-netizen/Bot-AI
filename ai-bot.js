@@ -1,4 +1,4 @@
-/* AI Bot — логика мини-приложения в стиле Chat GPT Trade Bot */
+/* AI Bot — логика мини-приложения */
 (function () {
   var TIMEFRAMES = [
     { label: '5 сек', value: 5 },
@@ -11,10 +11,19 @@
     { label: '1 день', value: 86400 }
   ];
 
+  var CATS = [
+    { id: 'currencies', label: 'Валюты' },
+    { id: 'crypto', label: 'Крипта' },
+    { id: 'commodities', label: 'Сырьё' },
+    { id: 'stocks', label: 'Акции' },
+    { id: 'indices', label: 'Индексы' }
+  ];
+
   var selectedPair = 'EURUSD_otc';
   var selectedTf = 5;
+  var selectedCat = 'currencies';
   var userId = localStorage.getItem('aiBotUserId') || '';
-  var pairs = [];
+  var allPairs = [];
   var searchQuery = '';
   var chartAnimators = [];
 
@@ -42,7 +51,7 @@
         userId = String(user.id);
         localStorage.setItem('aiBotUserId', userId);
         var el = $('tgAuto');
-        if (el) el.innerHTML = 'Телеграм ID определён автоматически: <b>' + userId + '</b>';
+        if (el) el.innerHTML = 'Телеграм ID: <b>' + userId + '</b>';
       }
     }
     updateUserBadge();
@@ -57,7 +66,7 @@
 
   function checkAccess() {
     if (!userId) {
-      alert('Доступ только по User ID. Введите его в разделе Профиль.');
+      alert('Доступ только по User ID. Введите его в Профиле.');
       showPage('profile');
       return false;
     }
@@ -68,12 +77,12 @@
     try {
       var res = await fetch('/api/payouts');
       var data = await res.json();
-      pairs = [];
+      allPairs = [];
       var cats = data.categories || {};
       Object.keys(cats).forEach(function (cat) {
         (cats[cat] || []).forEach(function (p) {
           if (p.active) {
-            pairs.push({
+            allPairs.push({
               symbol: p.symbol,
               display: p.display || p.symbol,
               payout: p.payout || 0,
@@ -82,49 +91,65 @@
           }
         });
       });
-      pairs.sort(function (a, b) {
-        if (b.payout !== a.payout) return b.payout - a.payout;
-        return (a.display || '').localeCompare(b.display || '');
-      });
+      renderCatTabs();
       renderPairs();
       renderHot();
     } catch (e) {
       console.error(e);
-      var box = $('pairList');
-      if (box) box.innerHTML = '<div style="color:var(--muted);padding:12px">Не удалось загрузить пары</div>';
+      var box = $('pairGrid');
+      if (box) box.innerHTML = '<div style="color:var(--muted);padding:12px;grid-column:1/-1">Не удалось загрузить пары</div>';
     }
   }
 
-  function getFilteredPairs() {
-    if (!searchQuery) return pairs;
-    var q = searchQuery.toLowerCase();
-    return pairs.filter(function (p) {
-      return (p.display || '').toLowerCase().indexOf(q) >= 0 ||
-             (p.symbol || '').toLowerCase().indexOf(q) >= 0;
+  function renderCatTabs() {
+    var box = $('catTabs');
+    if (!box) return;
+    box.innerHTML = CATS.map(function (c) {
+      var active = c.id === selectedCat ? ' active' : '';
+      var count = allPairs.filter(function (p) { return p.type === c.id; }).length;
+      return '<button class="' + active + '" data-cat="' + c.id + '">' + c.label + ' <span style="opacity:0.6">(' + count + ')</span></button>';
+    }).join('');
+    box.querySelectorAll('button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        selectedCat = btn.dataset.cat;
+        renderCatTabs();
+        renderPairs();
+      });
     });
   }
 
+  function getVisiblePairs() {
+    var list = allPairs.filter(function (p) { return p.type === selectedCat; });
+    if (searchQuery) {
+      var q = searchQuery.toLowerCase();
+      list = list.filter(function (p) {
+        return (p.display || '').toLowerCase().indexOf(q) >= 0 ||
+               (p.symbol || '').toLowerCase().indexOf(q) >= 0;
+      });
+    }
+    list.sort(function (a, b) { return (b.payout || 0) - (a.payout || 0); });
+    return list;
+  }
+
   function renderPairs() {
-    var box = $('pairList');
+    var box = $('pairGrid');
     var countEl = $('pairCount');
     if (!box) return;
-    var filtered = getFilteredPairs();
-    if (countEl) {
-      countEl.textContent = filtered.length + ' пар' + (searchQuery ? ' найдено' : ' всего');
-    }
-    if (!filtered.length) {
-      box.innerHTML = '<div style="color:var(--muted);padding:12px;text-align:center">Ничего не найдено</div>';
+    var list = getVisiblePairs();
+    if (countEl) countEl.textContent = list.length + ' пар в этой категории';
+    if (!list.length) {
+      box.innerHTML = '<div style="color:var(--muted);padding:12px;text-align:center;grid-column:1/-1">Ничего не найдено</div>';
       return;
     }
-    box.innerHTML = filtered.map(function (p) {
+    box.innerHTML = list.map(function (p) {
       var sel = p.symbol === selectedPair ? ' selected' : '';
-      return '<div class="pair-item' + sel + '" data-symbol="' + p.symbol + '">' +
-        '<div>' + p.display + '</div>' +
+      return '<div class="pair-card' + sel + '" data-symbol="' + p.symbol + '">' +
+        '<div class="name">' + p.display + '</div>' +
         '<div class="payout">' + (p.payout || 0) + '%</div></div>';
     }).join('');
-    box.querySelectorAll('.pair-item').forEach(function (item) {
-      item.addEventListener('click', function () {
-        selectedPair = item.dataset.symbol;
+    box.querySelectorAll('.pair-card').forEach(function (card) {
+      card.addEventListener('click', function () {
+        selectedPair = card.dataset.symbol;
         renderPairs();
       });
     });
@@ -133,9 +158,9 @@
   function renderHot() {
     var box = $('hotPairs');
     if (!box) return;
-    var hot = pairs.filter(function (p) { return p.payout >= 85; }).slice(0, 8);
+    var hot = allPairs.filter(function (p) { return p.payout >= 85; }).slice(0, 6);
     box.innerHTML = hot.map(function (p) {
-      return '<div class="pair-chip"><div>' + p.display + '</div><div class="payout">' + p.payout + '%</div></div>';
+      return '<div class="pair-card"><div class="name">' + p.display + '</div><div class="payout">' + p.payout + '%</div></div>';
     }).join('');
   }
 
@@ -157,70 +182,62 @@
   function createAnimatedChart(container, type) {
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'mini-chart');
-    svg.setAttribute('viewBox', '0 0 100 32');
+    svg.setAttribute('viewBox', '0 0 100 28');
     svg.setAttribute('preserveAspectRatio', 'none');
     container.appendChild(svg);
-
     var points = [];
-    var y = 16;
-    for (var i = 0; i < 20; i++) {
-      y += (Math.random() - 0.5) * 5;
-      y = Math.max(4, Math.min(28, y));
-      points.push({ x: i * 5.2, y: y });
+    var y = 14;
+    for (var i = 0; i < 18; i++) {
+      y += (Math.random() - 0.5) * 4;
+      y = Math.max(4, Math.min(24, y));
+      points.push({ x: i * 5.5, y: y });
     }
-
     var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
     poly.setAttribute('fill', 'none');
     poly.setAttribute('stroke', '#6b7280');
-    poly.setAttribute('stroke-width', '1.8');
+    poly.setAttribute('stroke-width', '1.6');
     poly.setAttribute('stroke-linecap', 'round');
-    poly.setAttribute('stroke-linejoin', 'round');
     svg.appendChild(poly);
-
     var bars = [];
     if (type === 'rsi') {
-      for (var b = 0; b < 8; b++) {
+      for (var b = 0; b < 7; b++) {
         var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('x', 4 + b * 12);
-        rect.setAttribute('y', 20);
+        rect.setAttribute('x', 6 + b * 13);
+        rect.setAttribute('y', 16);
         rect.setAttribute('width', 8);
         rect.setAttribute('height', 8);
         rect.setAttribute('rx', '1');
         rect.setAttribute('fill', '#8b6cff');
-        rect.setAttribute('opacity', '0.7');
         svg.appendChild(rect);
         bars.push(rect);
       }
     }
-
     var running = true;
     function tick() {
       if (!running) return;
       points.shift();
       var last = points[points.length - 1];
-      var ny = last.y + (Math.random() - 0.5) * 6;
-      ny = Math.max(4, Math.min(28, ny));
-      points.push({ x: last.x + 5.2, y: ny });
-      var d = points.map(function (p) { return p.x + ',' + p.y; }).join(' ');
-      poly.setAttribute('points', d);
+      var ny = last.y + (Math.random() - 0.5) * 5;
+      ny = Math.max(4, Math.min(24, ny));
+      points.push({ x: last.x + 5.5, y: ny });
+      poly.setAttribute('points', points.map(function (p) { return p.x + ',' + p.y; }).join(' '));
       if (bars.length) {
         bars.forEach(function (rect) {
-          var h = 4 + Math.random() * 18;
+          var h = 4 + Math.random() * 16;
           rect.setAttribute('height', h);
-          rect.setAttribute('y', 32 - h);
+          rect.setAttribute('y', 28 - h);
         });
       }
       requestAnimationFrame(tick);
     }
     tick();
-    return function stop() { running = false; };
+    return function () { running = false; };
   }
 
   async function getSignal() {
     if (!checkAccess()) return;
-    chartAnimators.forEach(function (stop) { stop(); });
+    chartAnimators.forEach(function (s) { s(); });
     chartAnimators = [];
-
     var btn = $('getSignalBtn');
     btn.disabled = true;
     $('signalMain').style.display = 'none';
@@ -245,12 +262,10 @@
       div.className = 'indicator';
       div.id = 'ind-' + ind.key;
       div.innerHTML = '<div class="label">' + ind.label + '</div><div class="value">—</div>';
-      var chartWrap = document.createElement('div');
-      chartWrap.className = 'chart-wrap';
-      div.appendChild(chartWrap);
+      var wrap = document.createElement('div');
+      div.appendChild(wrap);
       indBox.appendChild(div);
-      var stop = createAnimatedChart(chartWrap, ind.type);
-      chartAnimators.push(stop);
+      chartAnimators.push(createAnimatedChart(wrap, ind.type));
     });
 
     var bar = $('analysisBar');
@@ -266,7 +281,7 @@
       bar.style.width = (num / indicators.length * 100) + '%';
       var el = $('ind-' + indicators[i].key);
       if (el) el.classList.add('show');
-      await sleep(450);
+      await sleep(420);
     }
 
     try {
@@ -276,9 +291,7 @@
       var decision = null;
       if (window.SignalEngine && candles.length >= 10) {
         decision = SignalEngine.decide({
-          pair: selectedPair,
-          m1: candles,
-          now: Date.now(),
+          pair: selectedPair, m1: candles, now: Date.now(),
           lastTickAt: candles.length ? candles[candles.length - 1].t : Date.now()
         });
       }
@@ -288,12 +301,9 @@
         isDown = decision.direction === 'DOWN';
         reason = decision.reason || reason;
       } else if (candles.length >= 3) {
-        var last = candles[candles.length - 1].close;
-        var prev = candles[candles.length - 3].close;
-        isDown = last < prev;
+        isDown = candles[candles.length - 1].close < candles[candles.length - 3].close;
       }
-
-      var chartColor = isDown ? '#ff4d6a' : '#00f0a0';
+      var chartColor = isDown ? '#ff4d6d' : '#1ee687';
       indicators.forEach(function (ind) {
         var el = $('ind-' + ind.key);
         if (!el) return;
@@ -306,10 +316,9 @@
         if (poly) poly.setAttribute('stroke', chartColor);
         el.querySelectorAll('rect').forEach(function (r) { r.setAttribute('fill', chartColor); });
       });
-
       status.textContent = 'Анализ завершён';
       if (bottom) bottom.textContent = 'GPT 6.0 завершил анализ';
-      await sleep(900);
+      await sleep(800);
       showResult(isDown, reason);
     } catch (e) {
       status.textContent = 'Ошибка получения данных';
@@ -320,7 +329,7 @@
   }
 
   function showResult(isDown, reason) {
-    chartAnimators.forEach(function (stop) { stop(); });
+    chartAnimators.forEach(function (s) { s(); });
     chartAnimators = [];
     $('analysisView').style.display = 'none';
     var box = $('signalResult');
@@ -329,28 +338,23 @@
     var cls = isDown ? 'down' : 'up';
     var icon = isDown ? '↓' : '↑';
     var tfLabel = TIMEFRAMES.find(function (t) { return t.value === selectedTf; }) || { label: selectedTf + 'с' };
-    var pairName = pairs.find(function (p) { return p.symbol === selectedPair; });
+    var pairName = allPairs.find(function (p) { return p.symbol === selectedPair; });
     var pairLabel = pairName ? pairName.display : selectedPair;
     box.innerHTML =
       '<div class="big-signal ' + cls + '">' +
         '<div class="signal-icon ' + cls + '">' + icon + '</div>' +
-        '<div style="font-size:13px;color:var(--muted);margin-bottom:6px">' + pairLabel + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">' + pairLabel + '</div>' +
         '<div class="direction">' + dir + '</div>' +
-        '<div style="margin-top:8px;font-size:14px">Откройте «' + dir + '» на ' + tfLabel.label + ' в PocketOption</div>' +
+        '<div style="margin-top:8px;font-size:13px">Откройте «' + dir + '» на ' + tfLabel.label + '</div>' +
         '<div class="countdown" id="cd">Войдите за 0:' + String(Math.min(selectedTf, 59)).padStart(2, '0') + '</div>' +
-        '<div style="margin-top:12px;font-size:12px;color:var(--muted)">' + (reason || '') + '</div>' +
+        '<div style="margin-top:10px;font-size:11px;color:var(--muted)">' + (reason || '') + '</div>' +
       '</div>' +
       '<button class="get-signal" onclick="location.reload()">Новый сигнал</button>';
-
     var left = Math.min(selectedTf, 59);
     var cd = $('cd');
     var timer = setInterval(function () {
       left--;
-      if (left <= 0) {
-        clearInterval(timer);
-        if (cd) cd.textContent = 'Сделка завершена';
-        return;
-      }
+      if (left <= 0) { clearInterval(timer); if (cd) cd.textContent = 'Сделка завершена'; return; }
       if (cd) cd.textContent = 'Войдите за 0:' + String(left).padStart(2, '0');
     }, 1000);
   }
