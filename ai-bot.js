@@ -162,7 +162,7 @@
     $('signalResult').style.display = 'none';
 
     var indicators = [
-      { key: 'trend', label: 'Тренд' },
+      { key: 'trend', label: 'Тренд — ' + selectedTf + ' сек' },
       { key: 'support', label: 'Поддержка' },
       { key: 'move', label: 'Ход за ' + selectedTf + ' сек' },
       { key: 'impulse', label: 'Импульс' },
@@ -173,16 +173,20 @@
     ];
 
     var indBox = $('indicators');
-    indBox.innerHTML = indicators.map(function (ind, i) {
+    indBox.innerHTML = indicators.map(function (ind) {
       return '<div class="indicator" id="ind-' + ind.key + '"><div class="label">' + ind.label + '</div><div class="value">—</div></div>';
     }).join('');
 
     var bar = $('analysisBar');
     var status = $('analysisStatus');
+
+    // Sequential reveal of indicators
     for (var i = 0; i < indicators.length; i++) {
       status.textContent = 'GPT 6.0 анализирует... ' + (i + 1) + ' из ' + indicators.length;
       bar.style.width = ((i + 1) / indicators.length * 100) + '%';
-      await sleep(400);
+      var el = $('ind-' + indicators[i].key);
+      if (el) el.classList.add('show');
+      await sleep(450);
     }
 
     try {
@@ -209,15 +213,18 @@
         isDown = last < prev;
       }
 
+      // Fill values after animation
       indicators.forEach(function (ind) {
         var el = $('ind-' + ind.key);
         if (!el) return;
         var val = isDown ? 'Вниз' : 'Вверх';
         if (ind.key === 'rsi') val = isDown ? '38' : '62';
+        if (ind.key === 'support') val = isDown ? 'слабая' : 'сильная';
         el.querySelector('.value').textContent = val;
       });
 
-      await sleep(600);
+      status.textContent = 'Анализ завершён';
+      await sleep(700);
       showResult(isDown, reason);
     } catch (e) {
       status.textContent = 'Ошибка получения данных';
@@ -233,20 +240,22 @@
     box.style.display = 'block';
     var dir = isDown ? 'ВНИЗ' : 'ВВЕРХ';
     var cls = isDown ? 'down' : 'up';
+    var icon = isDown ? '↓' : '↑';
     var tfLabel = TIMEFRAMES.find(function (t) { return t.value === selectedTf; }) || { label: selectedTf + 'с' };
     var pairName = pairs.find(function (p) { return p.symbol === selectedPair; });
     var pairLabel = pairName ? pairName.display : selectedPair;
     box.innerHTML =
       '<div class="big-signal ' + cls + '">' +
+        '<div class="signal-icon ' + cls + '">' + icon + '</div>' +
         '<div style="font-size:13px;color:var(--muted);margin-bottom:6px">' + pairLabel + '</div>' +
         '<div class="direction">' + dir + '</div>' +
         '<div style="margin-top:8px;font-size:14px">Откройте «' + dir + '» на ' + tfLabel.label + ' в PocketOption</div>' +
-        '<div class="countdown" id="cd">Войдите за 0:' + String(selectedTf).padStart(2, '0') + '</div>' +
+        '<div class="countdown" id="cd">Войдите за 0:' + String(Math.min(selectedTf, 59)).padStart(2, '0') + '</div>' +
         '<div style="margin-top:12px;font-size:12px;color:var(--muted)">' + (reason || '') + '</div>' +
       '</div>' +
       '<button class="get-signal" onclick="location.reload()">Новый сигнал</button>';
 
-    var left = selectedTf;
+    var left = Math.min(selectedTf, 59);
     var cd = $('cd');
     var timer = setInterval(function () {
       left--;
