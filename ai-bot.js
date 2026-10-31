@@ -238,82 +238,58 @@
     return { isDown: isDown, reason: reason, entry: last };
   }
 
-  function createViz(container, type) {
+  function createViz(container, type, color) {
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 100 36');
+    svg.setAttribute('viewBox', '0 0 100 48');
     svg.setAttribute('width', '100%');
-    svg.setAttribute('height', '36');
+    svg.setAttribute('height', '48');
     svg.style.display = 'block';
     container.appendChild(svg);
     var running = true;
-    var uid = 'g' + Math.random().toString(36).slice(2, 8);
-
-    var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-    var grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
-    grad.setAttribute('id', uid);
-    grad.setAttribute('x1', '0');
-    grad.setAttribute('y1', '0');
-    grad.setAttribute('x2', '0');
-    grad.setAttribute('y2', '1');
-    var s1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-    s1.setAttribute('offset', '0%');
-    s1.setAttribute('stop-color', '#19e58b');
-    s1.setAttribute('stop-opacity', '0.5');
-    var s2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-    s2.setAttribute('offset', '100%');
-    s2.setAttribute('stop-color', '#19e58b');
-    s2.setAttribute('stop-opacity', '0');
-    grad.appendChild(s1);
-    grad.appendChild(s2);
-    defs.appendChild(grad);
-    svg.appendChild(defs);
+    var stroke = color || '#36d8f2';
 
     if (type === 'line' || type === 'support' || type === 'move' || type === 'ma') {
       var pts = [];
-      var y = 18;
-      for (var i = 0; i < 18; i++) {
-        y += (Math.random() - 0.48) * 4;
-        y = Math.max(4, Math.min(32, y));
-        pts.push({ x: i * 5.6, y: y });
+      var y = 24;
+      for (var i = 0; i < 16; i++) {
+        y += (Math.random() - 0.48) * 6;
+        y = Math.max(6, Math.min(42, y));
+        pts.push({ x: i * 6.4, y: y });
       }
-      var area = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-      area.setAttribute('fill', 'url(#' + uid + ')');
-      svg.appendChild(area);
       var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
       poly.setAttribute('fill', 'none');
-      poly.setAttribute('stroke', '#36d8f2');
-      poly.setAttribute('stroke-width', '1.8');
+      poly.setAttribute('stroke', stroke);
+      poly.setAttribute('stroke-width', '2');
       poly.setAttribute('stroke-linecap', 'round');
       svg.appendChild(poly);
       function tickLine() {
         if (!running) return;
         pts.shift();
         var last = pts[pts.length - 1];
-        var ny = last.y + (Math.random() - 0.5) * 5;
-        ny = Math.max(4, Math.min(32, ny));
-        pts.push({ x: last.x + 5.6, y: ny });
+        var ny = last.y + (Math.random() - 0.5) * 6;
+        ny = Math.max(6, Math.min(42, ny));
+        pts.push({ x: last.x + 6.4, y: ny });
         poly.setAttribute('points', pts.map(function (p) { return p.x + ',' + p.y; }).join(' '));
-        area.setAttribute('points', pts.map(function (p) { return p.x + ',' + p.y; }).join(' ') + ' 100,36 0,36');
         requestAnimationFrame(tickLine);
       }
       tickLine();
     } else if (type === 'impulse' || type === 'vol') {
       var bars = [];
-      for (var b = 0; b < 10; b++) {
+      for (var b = 0; b < 8; b++) {
         var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('x', 3 + b * 9.6);
-        rect.setAttribute('width', 6);
+        rect.setAttribute('x', 4 + b * 12);
+        rect.setAttribute('width', 8);
         rect.setAttribute('rx', '2');
-        rect.setAttribute('fill', '#19e58b');
+        rect.setAttribute('fill', stroke);
         svg.appendChild(rect);
         bars.push(rect);
       }
       function tickBars() {
         if (!running) return;
         bars.forEach(function (rect) {
-          var h = 4 + Math.random() * 24;
+          var h = 6 + Math.random() * 32;
           rect.setAttribute('height', h);
-          rect.setAttribute('y', 36 - h);
+          rect.setAttribute('y', 48 - h);
         });
         requestAnimationFrame(tickBars);
       }
@@ -321,29 +297,29 @@
     } else if (type === 'session') {
       var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       circle.setAttribute('cx', '50');
-      circle.setAttribute('cy', '18');
-      circle.setAttribute('r', '12');
+      circle.setAttribute('cy', '24');
+      circle.setAttribute('r', '14');
       circle.setAttribute('fill', 'none');
-      circle.setAttribute('stroke', '#36d8f2');
+      circle.setAttribute('stroke', stroke);
       circle.setAttribute('stroke-width', '2');
       svg.appendChild(circle);
       var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       dot.setAttribute('r', '4');
-      dot.setAttribute('fill', '#19e58b');
+      dot.setAttribute('fill', stroke);
       svg.appendChild(dot);
       var angle = 0;
       function tickSess() {
         if (!running) return;
-        angle += 0.06;
-        dot.setAttribute('cx', 50 + Math.cos(angle) * 12);
-        dot.setAttribute('cy', 18 + Math.sin(angle) * 12);
+        angle += 0.05;
+        dot.setAttribute('cx', 50 + Math.cos(angle) * 14);
+        dot.setAttribute('cy', 24 + Math.sin(angle) * 14);
         requestAnimationFrame(tickSess);
       }
       tickSess();
     } else if (type === 'rsi') {
       var bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       bg.setAttribute('x', '8');
-      bg.setAttribute('y', '14');
+      bg.setAttribute('y', '20');
       bg.setAttribute('width', '84');
       bg.setAttribute('height', '8');
       bg.setAttribute('rx', '4');
@@ -351,10 +327,10 @@
       svg.appendChild(bg);
       var fill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       fill.setAttribute('x', '8');
-      fill.setAttribute('y', '14');
+      fill.setAttribute('y', '20');
       fill.setAttribute('height', '8');
       fill.setAttribute('rx', '4');
-      fill.setAttribute('fill', '#19e58b');
+      fill.setAttribute('fill', stroke);
       svg.appendChild(fill);
       var rsiVal = 50;
       function tickRsi() {
@@ -386,14 +362,14 @@
 
     var tfName = tfLabel();
     var indicators = [
-      { key: 'trend', label: 'Тренд — ' + tfName, type: 'line' },
-      { key: 'support', label: 'Поддержка', type: 'support' },
-      { key: 'move', label: 'Ход за ' + tfName, type: 'move' },
-      { key: 'impulse', label: 'Импульс', type: 'impulse' },
-      { key: 'session', label: 'Сессия', type: 'session' },
-      { key: 'ma', label: 'Средние 50/200', type: 'ma' },
-      { key: 'rsi', label: 'RSI', type: 'rsi' },
-      { key: 'vol', label: 'Волатильность', type: 'vol' }
+      { key: 'trend', label: 'Тренд — ' + tfName, type: 'line', color: '#ff9a3c' },
+      { key: 'support', label: 'Поддержка', type: 'support', color: '#c46bff' },
+      { key: 'move', label: 'Ход за ' + tfName, type: 'move', color: '#ff5ec7' },
+      { key: 'impulse', label: 'Импульс', type: 'impulse', color: '#39ff6a' },
+      { key: 'session', label: 'Сессия', type: 'session', color: '#36d8f2' },
+      { key: 'ma', label: 'Средние 50/200', type: 'ma', color: '#ff5a5a' },
+      { key: 'rsi', label: 'RSI', type: 'rsi', color: '#ffe14a' },
+      { key: 'vol', label: 'Волатильность', type: 'vol', color: '#4ad4ff' }
     ];
 
     var indBox = $('indicators');
@@ -401,14 +377,14 @@
       indBox.innerHTML = '';
       indicators.forEach(function (ind) {
         var div = document.createElement('div');
-        div.className = 'indicator';
+        div.className = 'indicator ' + ind.key;
         div.id = 'ind-' + ind.key;
         div.innerHTML = '<div class="label">' + ind.label + '</div><div class="value">—</div>';
         var wrap = document.createElement('div');
         wrap.className = 'chart-wrap';
         div.appendChild(wrap);
         indBox.appendChild(div);
-        chartAnimators.push(createViz(wrap, ind.type));
+        chartAnimators.push(createViz(wrap, ind.type, ind.color));
       });
     }
 
@@ -467,7 +443,6 @@
         valueEl.textContent = val;
         valueEl.style.color = chartColor;
       }
-      el.querySelectorAll('polyline').forEach(function (p) { p.setAttribute('stroke', chartColor); });
     });
 
     if (status) status.textContent = 'Анализ завершён';
