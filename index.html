@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>AI Bot — Chat GPT Trade Bot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/ai-bot-3d.css?v=12">
+  <link rel="stylesheet" href="/ai-bot-3d.css?v=13">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     body {
@@ -47,6 +47,14 @@
       box-shadow: 0 8px 28px rgba(0,0,0,0.35), 0 0 20px rgba(54,216,242,0.12) !important;
       backdrop-filter: blur(16px);
     }
+    .tf-selector {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; border-radius: 14px; margin-bottom: 10px;
+      background: rgba(54,216,242,0.12); border: 1.5px solid rgba(54,216,242,0.5);
+      cursor: pointer;
+    }
+    .tf-selector .label { font-size: 12px; color: #a8c5d9; }
+    .tf-selector .value { font-size: 14px; font-weight: 800; color: #36d8f2; }
     .cat-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 10px; }
     .cat-tabs button {
       flex-shrink: 0; padding: 8px 14px; border-radius: 999px;
@@ -58,7 +66,7 @@
       color: #041018; border-color: transparent;
       box-shadow: 0 0 14px rgba(54,216,242,0.5);
     }
-    .pair-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 280px; overflow-y: auto; }
+    .pair-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 240px; overflow-y: auto; }
     .pair-card {
       background: rgba(30, 55, 85, 0.85);
       border: 1.5px solid rgba(54,216,242,0.55);
@@ -79,23 +87,11 @@
     .pair-card.selected .name { color: #041018; }
     .pair-card .payout { color: #19e58b; font-size: 12px; font-weight: 800; margin-top: 4px; text-shadow: 0 0 6px #19e58b; }
     .pair-card.selected .payout { color: #041018; text-shadow: none; }
-    .tf-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
-    .tf-btn {
-      background: rgba(54,216,242,0.1);
-      border: 1.5px solid rgba(54,216,242,0.45);
-      color: #e8f6ff; padding: 10px 4px; border-radius: 12px;
-      font-size: 12px; font-weight: 700; cursor: pointer;
-    }
-    .tf-btn.selected {
-      background: linear-gradient(145deg, #36d8f2, #19e58b);
-      color: #041018; border-color: transparent;
-      box-shadow: 0 0 12px rgba(54,216,242,0.4);
-    }
     .get-signal {
       width: 100%;
       background: linear-gradient(135deg, #19e58b, #0bc879);
       color: #041018; border: none; padding: 16px; border-radius: 14px;
-      font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 8px;
+      font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 10px;
       box-shadow: 0 6px 20px rgba(25,229,139,0.4);
     }
     .get-signal:disabled { opacity: 0.5; }
@@ -138,13 +134,31 @@
       box-shadow: 0 0 8px #19e58b;
     }
     .bottom-status { text-align: center; font-size: 12px; color: #a8c5d9; }
-    .signal-overlay {
+    .signal-overlay, .tf-overlay {
       position: fixed; inset: 0; z-index: 200;
-      background: rgba(8, 16, 28, 0.82);
+      background: rgba(8, 16, 28, 0.85);
       display: flex; align-items: center; justify-content: center;
       padding: 20px;
     }
-    .signal-overlay.hidden { display: none; }
+    .signal-overlay.hidden, .tf-overlay.hidden { display: none; }
+    .tf-modal {
+      background: rgba(22, 40, 64, 0.95);
+      border: 1.5px solid rgba(54,216,242,0.5);
+      border-radius: 20px;
+      padding: 20px;
+      width: 100%; max-width: 320px;
+    }
+    .tf-modal h3 { margin: 0 0 14px; color: #fff; font-size: 16px; text-align: center; }
+    .tf-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .tf-opt {
+      padding: 12px 8px; border-radius: 12px; text-align: center;
+      background: rgba(54,216,242,0.1); border: 1.5px solid rgba(54,216,242,0.4);
+      color: #e8f6ff; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    .tf-opt.selected {
+      background: linear-gradient(145deg, #36d8f2, #19e58b);
+      color: #041018; border-color: transparent;
+    }
     .big-signal {
       text-align: center; padding: 28px 20px; border-radius: 24px;
       width: 100%; max-width: 340px;
@@ -170,6 +184,10 @@
     }
     .signal-icon.down { border: 2px solid #ff526d; background: rgba(255,82,109,0.2); box-shadow: 0 0 16px #ff526d; }
     .signal-icon.up { border: 2px solid #19e58b; background: rgba(25,229,139,0.2); box-shadow: 0 0 16px #19e58b; }
+    .entry-price {
+      font-size: 18px; font-weight: 800; margin: 8px 0;
+      color: #36d8f2; text-shadow: 0 0 10px #36d8f2;
+    }
     .countdown { font-size: 13px; color: #a8c5d9; margin-top: 8px; }
     .bottom-nav {
       position: fixed; bottom: 0; left: 0; right: 0;
@@ -219,13 +237,15 @@
   <div id="page-signal" class="page">
     <div id="signalMain">
       <div class="ai3d-panel">
+        <div class="tf-selector" id="tfSelector">
+          <span class="label">Таймфрейм</span>
+          <span class="value" id="tfValue">5 сек</span>
+        </div>
         <div style="font-size:12px;color:#a8c5d9;margin-bottom:8px">Категория</div>
         <div class="cat-tabs" id="catTabs"></div>
         <input type="text" class="search-box" id="pairSearch" placeholder="Поиск пары...">
         <div class="pair-count" id="pairCount"></div>
         <div id="pairGrid" class="pair-grid"></div>
-        <div style="font-size:12px;color:#a8c5d9;margin:12px 0 6px">Время сделки</div>
-        <div class="tf-grid" id="tfGrid"></div>
         <button class="get-signal" id="getSignalBtn">⚙️ Получить сигнал</button>
       </div>
     </div>
@@ -264,10 +284,16 @@
     <button data-page="signal" class="active">Сигнал</button>
     <button data-page="profile">Профиль</button>
   </div>
+  <div id="tfOverlay" class="tf-overlay hidden">
+    <div class="tf-modal">
+      <h3>Выберите таймфрейм</h3>
+      <div class="tf-options" id="tfOptions"></div>
+    </div>
+  </div>
   <div id="signalOverlay" class="signal-overlay hidden">
     <div id="signalCard"></div>
   </div>
-  <script src="/signal-engine.js?v=12"></script>
-  <script src="/ai-bot.js?v=12"></script>
+  <script src="/signal-engine.js?v=13"></script>
+  <script src="/ai-bot.js?v=13"></script>
 </body>
 </html>
