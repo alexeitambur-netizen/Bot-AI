@@ -4,372 +4,231 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>AI Bot — Chat GPT Trade Bot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --bg: #050814;
-      --card: rgba(18, 24, 40, 0.75);
-      --card2: rgba(26, 34, 54, 0.9);
-      --green: #00f0a0;
-      --red: #ff4d6a;
-      --purple: #8b6cff;
-      --cyan: #00d4ff;
-      --text: #e8eaf6;
+      --bg-deep: #05050f;
+      --glass-bg: rgba(18, 22, 40, 0.72);
+      --glass-border: rgba(0, 200, 217, 0.22);
+      --neon-cyan: #00e5ff;
+      --neon-purple: #a855f7;
+      --neon-green: #1ee687;
+      --neon-red: #ff4d6d;
+      --text: #f0f4ff;
       --muted: #8b93b0;
-      --border: rgba(139, 108, 255, 0.25);
-      --glow: 0 0 20px rgba(139, 108, 255, 0.4);
+      --card: rgba(14, 18, 34, 0.85);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: radial-gradient(ellipse at 20% 0%, #1a0a3a 0%, #050814 50%, #0a0618 100%);
+      font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-deep);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       min-height: 100vh;
       padding-bottom: 70px;
       position: relative;
-      overflow-x: hidden;
     }
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><circle cx="2" cy="2" r="1" fill="%23ffffff" opacity="0.15"/></svg>') repeat;
-      pointer-events: none;
-      z-index: 0;
-      animation: stars 60s linear infinite;
+    .cosmic-bg {
+      position: fixed; inset: 0; z-index: -2;
+      background: linear-gradient(180deg, #05050f 0%, #0a0a1a 40%, #05050f 100%);
     }
-    @keyframes stars { to { background-position: 200px 200px; } }
+    .stars {
+      position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background: radial-gradient(1.5px 1.5px at 20% 30%, rgba(255,255,255,0.4), transparent),
+                  radial-gradient(1px 1px at 70% 60%, rgba(255,255,255,0.3), transparent),
+                  radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,0.25), transparent);
+      animation: drift 40s linear infinite;
+    }
+    @keyframes drift { to { background-position: 200px 100px; } }
     .header, .tabs-nav, .bottom-nav, .page { position: relative; z-index: 1; }
     .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between;
       padding: 14px 16px;
-      background: rgba(10, 14, 28, 0.8);
+      background: rgba(8, 10, 22, 0.75);
       backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      border-bottom: 1px solid var(--glass-border);
+      position: sticky; top: 0; z-index: 100;
     }
-    .header .title { font-weight: 700; font-size: 16px; text-shadow: 0 0 10px var(--purple); }
-    .header .live {
+    .header .title { font-weight: 800; font-size: 15px; letter-spacing: 0.5px; }
+    .live {
       background: linear-gradient(90deg, #ff3b5c, #ff6b8a);
-      color: #fff;
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 6px;
-      margin-right: 8px;
-      box-shadow: 0 0 12px #ff3b5c;
-      animation: pulse 2s infinite;
+      color: #fff; font-size: 10px; font-weight: 800;
+      padding: 3px 8px; border-radius: 6px; margin-right: 8px;
+      box-shadow: 0 0 10px #ff3b5c;
     }
-    @keyframes pulse { 0%,100%{opacity:1; transform:scale(1)} 50%{opacity:0.75; transform:scale(1.05)} }
     .tabs-nav {
       display: flex;
-      background: rgba(10, 14, 28, 0.7);
-      backdrop-filter: blur(8px);
-      border-bottom: 1px solid var(--border);
+      background: rgba(8, 10, 22, 0.6);
+      border-bottom: 1px solid var(--glass-border);
     }
     .tabs-nav button {
-      flex: 1;
-      padding: 14px;
-      background: none;
-      border: none;
-      color: var(--muted);
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s;
+      flex: 1; padding: 14px; background: none; border: none;
+      color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer;
     }
-    .tabs-nav button.active {
-      color: #fff;
-      border-bottom: 2px solid var(--purple);
-      text-shadow: 0 0 8px var(--purple);
-    }
-    .page { display: none; padding: 16px; }
+    .tabs-nav button.active { color: #fff; border-bottom: 2px solid var(--neon-cyan); }
+    .page { display: none; padding: 14px; }
     .page.active { display: block; }
-    .pair-card, .signal-card, .analysis-card, .profile-box {
-      background: var(--card);
-      border-radius: 20px;
-      padding: 18px;
-      margin-bottom: 14px;
-      border: 1px solid var(--border);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
-      backdrop-filter: blur(10px);
-      transform: perspective(800px) rotateX(0deg);
-      transition: transform 0.3s;
-    }
-    .search-box {
-      width: 100%;
-      padding: 14px 16px;
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: rgba(20, 28, 45, 0.8);
-      color: #fff;
-      font-size: 14px;
+    .glass-box {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 22px;
+      padding: 16px;
       margin-bottom: 12px;
-      outline: none;
-      box-shadow: inset 0 2px 8px rgba(0,0,0,0.3);
+      box-shadow: 0 10px 28px rgba(0,0,0,0.4);
     }
-    .search-box:focus { border-color: var(--purple); box-shadow: 0 0 0 2px rgba(139,108,255,0.3); }
-    .pair-list {
-      max-height: 280px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 12px;
+    .cat-tabs {
+      display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 10px;
     }
-    .pair-item {
-      background: var(--card2);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 12px 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      cursor: pointer;
-      font-size: 14px;
-      transition: all 0.25s;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    .cat-tabs button {
+      flex-shrink: 0; padding: 8px 14px; border-radius: 999px;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer;
     }
-    .pair-item.selected {
-      border-color: var(--green);
-      background: rgba(0, 240, 160, 0.08);
-      box-shadow: 0 0 16px rgba(0, 240, 160, 0.25);
+    .cat-tabs button.active {
+      background: linear-gradient(90deg, var(--neon-cyan), #00b8d4);
+      color: #000; border-color: transparent;
+      box-shadow: 0 0 12px rgba(0,229,255,0.4);
     }
-    .pair-item .payout { color: var(--green); font-weight: 700; }
-    .pair-row {
-      display: flex;
-      gap: 10px;
-      overflow-x: auto;
-      padding-bottom: 8px;
-      margin-bottom: 12px;
+    .pair-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 320px; overflow-y: auto;
     }
-    .pair-chip {
-      background: var(--card2);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 10px 14px;
-      min-width: 110px;
+    .pair-card {
+      background: rgba(20, 26, 44, 0.9);
+      border: 1px solid rgba(0,229,255,0.15);
+      border-radius: 16px;
+      padding: 12px;
       text-align: center;
       cursor: pointer;
-      font-size: 13px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     }
-    .pair-chip .payout { color: var(--green); font-weight: 700; }
+    .pair-card.selected {
+      border-color: var(--neon-green);
+      background: rgba(30,230,135,0.08);
+      box-shadow: 0 0 16px rgba(30,230,135,0.3);
+    }
+    .pair-card .name { font-size: 13px; font-weight: 700; }
+    .pair-card .payout { color: var(--neon-green); font-size: 12px; font-weight: 800; margin-top: 4px; }
     .tf-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin: 12px 0;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0;
     }
     .tf-btn {
-      background: var(--card2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 10px 4px;
-      border-radius: 12px;
-      cursor: pointer;
-      font-size: 13px;
-      transition: all 0.2s;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text); padding: 10px 4px; border-radius: 12px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
     }
     .tf-btn.selected {
-      background: linear-gradient(135deg, var(--green), #00b87a);
-      color: #000;
-      border-color: var(--green);
-      font-weight: 700;
-      transform: translateY(-2px) scale(1.04);
-      box-shadow: 0 6px 16px rgba(0, 240, 160, 0.4);
+      background: linear-gradient(135deg, var(--neon-green), #00c98a);
+      color: #000; border-color: transparent;
+      box-shadow: 0 4px 14px rgba(30,230,135,0.35);
     }
     .get-signal {
       width: 100%;
-      background: linear-gradient(90deg, var(--green), #00c98a);
-      color: #000;
-      border: none;
-      padding: 16px;
-      border-radius: 14px;
-      font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-      margin-top: 8px;
-      box-shadow: 0 6px 20px rgba(0, 240, 160, 0.35);
-      transition: transform 0.15s, box-shadow 0.15s;
+      background: linear-gradient(90deg, var(--neon-green), #00c98a);
+      color: #000; border: none; padding: 16px; border-radius: 16px;
+      font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 8px;
+      box-shadow: 0 6px 20px rgba(30,230,135,0.35);
     }
-    .get-signal:active { transform: scale(0.97); }
     .get-signal:disabled { opacity: 0.5; }
-    /* Analysis 3D */
-    .analysis-top {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 16px;
-    }
-    .spinner-wrap {
-      width: 52px;
-      height: 52px;
-      position: relative;
-      flex-shrink: 0;
-      filter: drop-shadow(0 0 8px var(--purple));
-    }
+    /* Analysis */
+    .analysis-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
     .spinner {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      background: conic-gradient(from 0deg, #7c5cfc, #00d4ff, #7c5cfc);
+      width: 48px; height: 48px; border-radius: 50%;
+      background: conic-gradient(from 0deg, var(--neon-cyan), var(--neon-purple), var(--neon-cyan));
       animation: spin 1.1s linear infinite;
-      mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
-      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+      filter: drop-shadow(0 0 8px var(--neon-cyan));
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .analysis-title { font-weight: 700; font-size: 18px; text-shadow: 0 0 12px var(--purple); }
-    .analysis-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .analysis-title { font-weight: 800; font-size: 17px; }
+    .analysis-sub { font-size: 12px; color: var(--muted); }
     .readings-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      color: var(--muted);
-      margin: 8px 0 12px;
+      display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 6px 0 10px;
     }
-    .analysis-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
+    .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .indicator {
-      background: linear-gradient(145deg, rgba(30,40,60,0.9), rgba(18,24,40,0.95));
-      border: 1px solid rgba(139,108,255,0.2);
+      background: rgba(20,26,44,0.9);
+      border: 1px solid rgba(0,229,255,0.12);
       border-radius: 16px;
-      padding: 12px;
-      font-size: 13px;
-      opacity: 0;
-      transform: translateY(12px) rotateX(8deg);
-      transition: all 0.4s cubic-bezier(0.34, 1.3, 0.64, 1);
-      min-height: 100px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
-      perspective: 400px;
+      padding: 10px;
+      min-height: 90px;
+      opacity: 0; transform: translateY(8px);
+      transition: all 0.35s ease;
     }
-    .indicator.show {
-      opacity: 1;
-      transform: translateY(0) rotateX(0deg);
-    }
-    .indicator .label { color: var(--muted); font-size: 11px; margin-bottom: 4px; }
-    .indicator .value { font-weight: 700; font-size: 15px; margin-bottom: 6px; text-shadow: 0 0 6px currentColor; }
-    .mini-chart { width: 100%; height: 32px; display: block; overflow: hidden; }
+    .indicator.show { opacity: 1; transform: translateY(0); }
+    .indicator .label { font-size: 10px; color: var(--muted); }
+    .indicator .value { font-weight: 800; font-size: 14px; margin: 4px 0; }
+    .mini-chart { width: 100%; height: 28px; display: block; }
     .progress {
-      height: 6px;
-      background: rgba(42,51,72,0.6);
-      border-radius: 3px;
-      margin: 14px 0 8px;
-      overflow: hidden;
-      box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
+      height: 5px; background: rgba(255,255,255,0.08); border-radius: 3px; margin: 12px 0 6px; overflow: hidden;
     }
     .progress > div {
-      height: 100%;
-      background: linear-gradient(90deg, var(--purple), var(--cyan));
-      width: 0%;
-      transition: width 0.35s ease;
-      box-shadow: 0 0 10px var(--purple);
+      height: 100%; background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+      width: 0%; transition: width 0.35s;
     }
-    .bottom-status {
-      text-align: center;
-      font-size: 13px;
-      color: var(--muted);
-      padding: 6px 0;
-    }
-    /* Signal result 3D */
+    .bottom-status { text-align: center; font-size: 12px; color: var(--muted); }
+    /* Signal */
     .big-signal {
-      text-align: center;
-      padding: 32px 16px;
-      border-radius: 24px;
-      margin: 16px 0;
-      opacity: 0;
-      transform: scale(0.75) rotateX(15deg);
-      animation: signalPop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+      text-align: center; padding: 28px 16px; border-radius: 24px; margin: 12px 0;
+      animation: pop 0.6s cubic-bezier(0.34,1.56,0.64,1);
     }
-    @keyframes signalPop { to { opacity: 1; transform: scale(1) rotateX(0deg); } }
+    @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     .big-signal.down {
-      background: linear-gradient(180deg, rgba(42,10,10,0.9), rgba(18,5,5,0.95));
-      border: 1px solid rgba(255,77,106,0.4);
-      box-shadow: 0 0 50px rgba(255,77,106,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
+      background: linear-gradient(180deg, rgba(40,10,15,0.9), rgba(15,5,8,0.95));
+      border: 1px solid rgba(255,77,109,0.4);
+      box-shadow: 0 0 40px rgba(255,77,109,0.2);
     }
     .big-signal.up {
-      background: linear-gradient(180deg, rgba(10,42,26,0.9), rgba(5,26,13,0.95));
-      border: 1px solid rgba(0,240,160,0.4);
-      box-shadow: 0 0 50px rgba(0,240,160,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
+      background: linear-gradient(180deg, rgba(10,40,25,0.9), rgba(5,20,12,0.95));
+      border: 1px solid rgba(30,230,135,0.4);
+      box-shadow: 0 0 40px rgba(30,230,135,0.2);
     }
-    .big-signal .direction {
-      font-size: 52px;
-      font-weight: 800;
-      letter-spacing: 2px;
-      animation: glow 1.5s ease-in-out infinite alternate;
-    }
-    @keyframes glow {
-      from { text-shadow: 0 0 12px currentColor; }
-      to { text-shadow: 0 0 30px currentColor, 0 0 50px currentColor; }
-    }
-    .big-signal.down .direction { color: var(--red); }
-    .big-signal.up .direction { color: var(--green); }
-    .countdown { font-size: 14px; color: var(--muted); margin-top: 8px; }
+    .big-signal .direction { font-size: 46px; font-weight: 900; letter-spacing: 1px; }
+    .big-signal.down .direction { color: var(--neon-red); text-shadow: 0 0 20px var(--neon-red); }
+    .big-signal.up .direction { color: var(--neon-green); text-shadow: 0 0 20px var(--neon-green); }
     .signal-icon {
-      width: 68px;
-      height: 68px;
-      border-radius: 50%;
-      margin: 0 auto 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 30px;
-      animation: spinIn 0.8s ease-out;
+      width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 28px;
     }
-    @keyframes spinIn {
-      from { transform: rotate(-180deg) scale(0); opacity: 0; }
-      to { transform: rotate(0) scale(1); opacity: 1; }
-    }
-    .signal-icon.down { background: radial-gradient(circle, #ff4d6a44, transparent); border: 2px solid var(--red); box-shadow: 0 0 20px var(--red); }
-    .signal-icon.up { background: radial-gradient(circle, #00f0a044, transparent); border: 2px solid var(--green); box-shadow: 0 0 20px var(--green); }
+    .signal-icon.down { border: 2px solid var(--neon-red); background: rgba(255,77,109,0.15); }
+    .signal-icon.up { border: 2px solid var(--neon-green); background: rgba(30,230,135,0.15); }
+    .countdown { font-size: 13px; color: var(--muted); margin-top: 8px; }
     .bottom-nav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(10,14,28,0.85);
-      backdrop-filter: blur(12px);
-      border-top: 1px solid var(--border);
-      display: flex;
-      padding: 8px 0 env(safe-area-inset-bottom);
-      z-index: 100;
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: rgba(8,10,22,0.9); backdrop-filter: blur(12px);
+      border-top: 1px solid var(--glass-border);
+      display: flex; padding: 8px 0 env(safe-area-inset-bottom); z-index: 100;
     }
     .bottom-nav button {
-      flex: 1;
-      background: none;
-      border: none;
-      color: var(--muted);
-      font-size: 12px;
-      padding: 8px;
-      cursor: pointer;
+      flex: 1; background: none; border: none; color: var(--muted);
+      font-size: 11px; font-weight: 700; padding: 8px; cursor: pointer;
     }
-    .bottom-nav button.active { color: #fff; text-shadow: 0 0 6px var(--purple); }
+    .bottom-nav button.active { color: #fff; }
     .profile-box input {
-      width: 100%;
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: rgba(20,28,45,0.8);
-      color: #fff;
-      margin: 8px 0;
+      width: 100%; padding: 12px; border-radius: 12px;
+      border: 1px solid var(--glass-border); background: rgba(20,26,44,0.8);
+      color: #fff; margin: 8px 0;
     }
-    .status-ok { color: var(--green); }
-    .status-err { color: var(--red); }
-    .pair-count { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .status-ok { color: var(--neon-green); }
+    .status-err { color: var(--neon-red); }
+    .pair-count { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+    .search-box {
+      width: 100%; padding: 12px 14px; border-radius: 14px;
+      border: 1px solid var(--glass-border); background: rgba(20,26,44,0.7);
+      color: #fff; font-size: 13px; margin-bottom: 10px; outline: none;
+    }
   </style>
 </head>
 <body>
+  <div class="cosmic-bg"></div>
+  <div class="stars"></div>
+
   <div class="header">
     <div><span class="live">LIVE</span><span class="title">Chat GPT Trade Bot</span></div>
-    <div id="userBadge" style="font-size:12px;color:var(--muted)"></div>
+    <div id="userBadge" style="font-size:11px;color:var(--muted)"></div>
   </div>
 
   <div class="tabs-nav">
@@ -379,32 +238,33 @@
   </div>
 
   <div id="page-today" class="page active">
-    <div class="pair-card">
-      <h3 style="margin-bottom:12px">Статистика за сегодня</h3>
+    <div class="glass-box">
+      <h3 style="margin-bottom:10px;font-size:15px">Статистика за сегодня</h3>
       <div id="todayStats">Загрузка...</div>
     </div>
-    <div class="pair-card">
-      <div>Высокий процент выплаты на парах</div>
-      <div id="hotPairs" class="pair-row" style="margin-top:12px"></div>
+    <div class="glass-box">
+      <div style="font-size:13px;margin-bottom:8px">Высокий процент выплаты</div>
+      <div id="hotPairs" class="pair-grid"></div>
     </div>
   </div>
 
   <div id="page-signal" class="page">
     <div id="signalMain">
-      <div class="pair-card">
-        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Выберите пару</div>
-        <input type="text" class="search-box" id="pairSearch" placeholder="Поиск пары (EUR, AUD, BTC...)">
+      <div class="glass-box">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Категория</div>
+        <div class="cat-tabs" id="catTabs"></div>
+        <input type="text" class="search-box" id="pairSearch" placeholder="Поиск пары...">
         <div class="pair-count" id="pairCount"></div>
-        <div id="pairList" class="pair-list"></div>
-        <div style="font-size:13px;color:var(--muted);margin:12px 0 8px">Время сделки</div>
+        <div id="pairGrid" class="pair-grid"></div>
+        <div style="font-size:12px;color:var(--muted);margin:12px 0 6px">Время сделки</div>
         <div class="tf-grid" id="tfGrid"></div>
         <button class="get-signal" id="getSignalBtn">⚙️ Получить сигнал</button>
       </div>
     </div>
     <div id="analysisView" style="display:none">
-      <div class="analysis-card">
+      <div class="glass-box">
         <div class="analysis-top">
-          <div class="spinner-wrap"><div class="spinner"></div></div>
+          <div class="spinner"></div>
           <div>
             <div class="analysis-title">Анализ...</div>
             <div class="analysis-sub" id="analysisStatus">Взвешиваю всё...</div>
@@ -423,14 +283,14 @@
   </div>
 
   <div id="page-profile" class="page">
-    <div class="profile-box">
+    <div class="glass-box">
       <h3>Профиль</h3>
-      <p style="color:var(--muted);font-size:14px;margin:8px 0">Доступ к сигналам только по User ID</p>
-      <div id="tgAuto" style="margin:12px 0;font-size:14px"></div>
-      <label style="font-size:13px;color:var(--muted)">User ID (Telegram)</label>
-      <input type="text" id="userIdInput" placeholder="Введите ваш Telegram ID">
-      <button class="get-signal" id="saveIdBtn" style="margin-top:8px">Сохранить</button>
-      <div id="profileStatus" style="margin-top:12px;font-size:14px"></div>
+      <p style="color:var(--muted);font-size:13px;margin:8px 0">Доступ к сигналам только по User ID</p>
+      <div id="tgAuto" style="margin:10px 0;font-size:13px"></div>
+      <label style="font-size:12px;color:var(--muted)">User ID (Telegram)</label>
+      <input type="text" id="userIdInput" placeholder="Введите Telegram ID">
+      <button class="get-signal" id="saveIdBtn">Сохранить</button>
+      <div id="profileStatus" style="margin-top:10px;font-size:13px"></div>
     </div>
   </div>
 
@@ -440,7 +300,7 @@
     <button data-page="profile">Профиль</button>
   </div>
 
-  <script src="/signal-engine.js?v=5"></script>
-  <script src="/ai-bot.js?v=5"></script>
+  <script src="/signal-engine.js?v=6"></script>
+  <script src="/ai-bot.js?v=6"></script>
 </body>
 </html>
