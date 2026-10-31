@@ -153,6 +153,19 @@
     });
   }
 
+  function makeMiniChart(color) {
+    var points = [];
+    var y = 14;
+    for (var i = 0; i < 12; i++) {
+      y += (Math.random() - 0.48) * 6;
+      y = Math.max(4, Math.min(24, y));
+      points.push((i * 9) + ',' + y.toFixed(1));
+    }
+    return '<svg class="mini-chart" viewBox="0 0 100 28" preserveAspectRatio="none">' +
+      '<polyline fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" points="' + points.join(' ') + '"/>' +
+      '</svg>';
+  }
+
   async function getSignal() {
     if (!checkAccess()) return;
     var btn = $('getSignalBtn');
@@ -162,31 +175,40 @@
     $('signalResult').style.display = 'none';
 
     var indicators = [
-      { key: 'trend', label: 'Тренд — ' + selectedTf + ' сек' },
-      { key: 'support', label: 'Поддержка' },
-      { key: 'move', label: 'Ход за ' + selectedTf + ' сек' },
-      { key: 'impulse', label: 'Импульс' },
-      { key: 'session', label: 'Сессия' },
-      { key: 'ma', label: 'Средние 50/200' },
-      { key: 'rsi', label: 'RSI' },
-      { key: 'vol', label: 'Волатильность' }
+      { key: 'trend', label: 'Тренд — ' + selectedTf + ' сек', chart: true },
+      { key: 'support', label: 'Поддержка', chart: true },
+      { key: 'move', label: 'Ход за ' + selectedTf + ' сек', chart: true },
+      { key: 'impulse', label: 'Импульс', chart: true },
+      { key: 'session', label: 'Сессия', chart: false },
+      { key: 'ma', label: 'Средние 50/200', chart: true },
+      { key: 'rsi', label: 'RSI', chart: false },
+      { key: 'vol', label: 'Волатильность', chart: true }
     ];
 
     var indBox = $('indicators');
     indBox.innerHTML = indicators.map(function (ind) {
-      return '<div class="indicator" id="ind-' + ind.key + '"><div class="label">' + ind.label + '</div><div class="value">—</div></div>';
+      var chartHtml = ind.chart ? makeMiniChart('#6b7280') : '';
+      return '<div class="indicator" id="ind-' + ind.key + '">' +
+        '<div class="label">' + ind.label + '</div>' +
+        '<div class="value">—</div>' +
+        chartHtml +
+        '</div>';
     }).join('');
 
     var bar = $('analysisBar');
     var status = $('analysisStatus');
+    var countEl = $('progressCount');
+    var bottom = $('bottomStatus');
 
-    // Sequential reveal of indicators
     for (var i = 0; i < indicators.length; i++) {
-      status.textContent = 'GPT 6.0 анализирует... ' + (i + 1) + ' из ' + indicators.length;
-      bar.style.width = ((i + 1) / indicators.length * 100) + '%';
+      var num = i + 1;
+      status.textContent = 'Взвешиваю всё...';
+      if (bottom) bottom.textContent = 'GPT 6.0 анализирует... ' + num + ' из ' + indicators.length;
+      if (countEl) countEl.textContent = num + ' из ' + indicators.length;
+      bar.style.width = (num / indicators.length * 100) + '%';
       var el = $('ind-' + indicators[i].key);
       if (el) el.classList.add('show');
-      await sleep(450);
+      await sleep(420);
     }
 
     try {
@@ -213,7 +235,7 @@
         isDown = last < prev;
       }
 
-      // Fill values after animation
+      var chartColor = isDown ? '#ff4d4d' : '#00d26a';
       indicators.forEach(function (ind) {
         var el = $('ind-' + ind.key);
         if (!el) return;
@@ -221,10 +243,13 @@
         if (ind.key === 'rsi') val = isDown ? '38' : '62';
         if (ind.key === 'support') val = isDown ? 'слабая' : 'сильная';
         el.querySelector('.value').textContent = val;
+        var svg = el.querySelector('svg');
+        if (svg) svg.innerHTML = svg.innerHTML.replace(/stroke="[^"]+"/, 'stroke="' + chartColor + '"');
       });
 
       status.textContent = 'Анализ завершён';
-      await sleep(700);
+      if (bottom) bottom.textContent = 'GPT 6.0 завершил анализ';
+      await sleep(800);
       showResult(isDown, reason);
     } catch (e) {
       status.textContent = 'Ошибка получения данных';
