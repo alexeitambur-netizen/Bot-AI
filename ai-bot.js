@@ -191,46 +191,74 @@
 
   function createViz(container, type) {
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 100 32');
+    svg.setAttribute('viewBox', '0 0 100 36');
     svg.setAttribute('width', '100%');
-    svg.setAttribute('height', '32');
+    svg.setAttribute('height', '36');
     svg.style.display = 'block';
     container.appendChild(svg);
     var running = true;
+    var uid = 'g' + Math.random().toString(36).slice(2, 8);
 
-    if (type === 'line' || type === 'support' || type === 'ma') {
+    var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    var grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+    grad.setAttribute('id', uid);
+    grad.setAttribute('x1', '0');
+    grad.setAttribute('y1', '0');
+    grad.setAttribute('x2', '0');
+    grad.setAttribute('y2', '1');
+    var s1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    s1.setAttribute('offset', '0%');
+    s1.setAttribute('stop-color', '#a855f7');
+    s1.setAttribute('stop-opacity', '0.6');
+    var s2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    s2.setAttribute('offset', '100%');
+    s2.setAttribute('stop-color', '#a855f7');
+    s2.setAttribute('stop-opacity', '0');
+    grad.appendChild(s1);
+    grad.appendChild(s2);
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    if (type === 'line' || type === 'support' || type === 'move' || type === 'ma') {
       var pts = [];
-      var y = 16;
-      for (var i = 0; i < 16; i++) {
-        y += (Math.random() - 0.5) * 5;
-        y = Math.max(4, Math.min(28, y));
-        pts.push({ x: i * 6.4, y: y });
+      var y = 18;
+      for (var i = 0; i < 18; i++) {
+        y += (Math.random() - 0.48) * 4;
+        y = Math.max(4, Math.min(32, y));
+        pts.push({ x: i * 5.6, y: y });
       }
+      var area = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      area.setAttribute('fill', 'url(#' + uid + ')');
+      svg.appendChild(area);
       var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
       poly.setAttribute('fill', 'none');
-      poly.setAttribute('stroke', '#6b7280');
-      poly.setAttribute('stroke-width', type === 'ma' ? '1.2' : '1.8');
+      poly.setAttribute('stroke', '#c084fc');
+      poly.setAttribute('stroke-width', '1.8');
       poly.setAttribute('stroke-linecap', 'round');
+      poly.setAttribute('filter', 'drop-shadow(0 0 3px #a855f7)');
       svg.appendChild(poly);
       var poly2 = null;
       if (type === 'ma') {
         poly2 = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
         poly2.setAttribute('fill', 'none');
-        poly2.setAttribute('stroke', '#8b6cff');
+        poly2.setAttribute('stroke', '#f43f5e');
         poly2.setAttribute('stroke-width', '1.2');
-        poly2.setAttribute('stroke-dasharray', '2,2');
+        poly2.setAttribute('stroke-dasharray', '3,2');
         svg.appendChild(poly2);
       }
       function tickLine() {
         if (!running) return;
         pts.shift();
         var last = pts[pts.length - 1];
-        var ny = last.y + (Math.random() - 0.5) * 6;
-        ny = Math.max(4, Math.min(28, ny));
-        pts.push({ x: last.x + 6.4, y: ny });
-        poly.setAttribute('points', pts.map(function (p) { return p.x + ',' + p.y; }).join(' '));
+        var ny = last.y + (Math.random() - 0.5) * 5;
+        ny = Math.max(4, Math.min(32, ny));
+        pts.push({ x: last.x + 5.6, y: ny });
+        var linePts = pts.map(function (p) { return p.x + ',' + p.y; }).join(' ');
+        poly.setAttribute('points', linePts);
+        var areaPts = pts.map(function (p) { return p.x + ',' + p.y; }).join(' ') + ' 100,36 0,36';
+        area.setAttribute('points', areaPts);
         if (poly2) {
-          var pts2 = pts.map(function (p, i) { return (p.x) + ',' + Math.max(4, Math.min(28, p.y + Math.sin(i * 0.5) * 3)); });
+          var pts2 = pts.map(function (p, i) { return p.x + ',' + Math.max(4, Math.min(32, p.y + Math.sin(i * 0.4) * 4)); });
           poly2.setAttribute('points', pts2.join(' '));
         }
         requestAnimationFrame(tickLine);
@@ -238,66 +266,48 @@
       tickLine();
     } else if (type === 'impulse' || type === 'vol') {
       var bars = [];
-      for (var b = 0; b < 8; b++) {
+      for (var b = 0; b < 10; b++) {
         var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('x', 4 + b * 12);
-        rect.setAttribute('width', 8);
-        rect.setAttribute('rx', '1.5');
-        rect.setAttribute('fill', '#8b6cff');
-        rect.setAttribute('opacity', '0.85');
+        rect.setAttribute('x', 3 + b * 9.6);
+        rect.setAttribute('width', 6);
+        rect.setAttribute('rx', '2');
+        rect.setAttribute('fill', '#a855f7');
+        rect.setAttribute('opacity', '0.9');
         svg.appendChild(rect);
         bars.push(rect);
       }
       function tickBars() {
         if (!running) return;
-        bars.forEach(function (rect) {
-          var h = 4 + Math.random() * 22;
+        bars.forEach(function (rect, i) {
+          var h = 6 + Math.sin(Date.now() / 200 + i) * 10 + Math.random() * 8;
+          h = Math.max(4, Math.min(28, h));
           rect.setAttribute('height', h);
-          rect.setAttribute('y', 32 - h);
+          rect.setAttribute('y', 36 - h);
         });
         requestAnimationFrame(tickBars);
       }
       tickBars();
-    } else if (type === 'move') {
-      var arrows = [];
-      for (var a = 0; a < 5; a++) {
-        var g = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        g.setAttribute('x', 10 + a * 18);
-        g.setAttribute('y', 20);
-        g.setAttribute('font-size', '12');
-        g.setAttribute('fill', '#6b7280');
-        g.textContent = Math.random() > 0.5 ? '↑' : '↓';
-        svg.appendChild(g);
-        arrows.push(g);
-      }
-      function tickMove() {
-        if (!running) return;
-        arrows.forEach(function (el) {
-          el.textContent = Math.random() > 0.5 ? '↑' : '↓';
-          el.setAttribute('fill', el.textContent === '↑' ? '#1ee687' : '#ff4d6d');
-        });
-        setTimeout(tickMove, 280);
-      }
-      tickMove();
     } else if (type === 'session') {
       var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       circle.setAttribute('cx', '50');
-      circle.setAttribute('cy', '16');
-      circle.setAttribute('r', '10');
+      circle.setAttribute('cy', '18');
+      circle.setAttribute('r', '12');
       circle.setAttribute('fill', 'none');
-      circle.setAttribute('stroke', '#6b7280');
+      circle.setAttribute('stroke', '#a855f7');
       circle.setAttribute('stroke-width', '2');
+      circle.setAttribute('opacity', '0.5');
       svg.appendChild(circle);
       var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      dot.setAttribute('r', '3');
-      dot.setAttribute('fill', '#8b6cff');
+      dot.setAttribute('r', '4');
+      dot.setAttribute('fill', '#c084fc');
+      dot.setAttribute('filter', 'drop-shadow(0 0 4px #a855f7)');
       svg.appendChild(dot);
       var angle = 0;
       function tickSess() {
         if (!running) return;
-        angle += 0.08;
-        var cx = 50 + Math.cos(angle) * 10;
-        var cy = 16 + Math.sin(angle) * 10;
+        angle += 0.06;
+        var cx = 50 + Math.cos(angle) * 12;
+        var cy = 18 + Math.sin(angle) * 12;
         dot.setAttribute('cx', cx);
         dot.setAttribute('cy', cy);
         requestAnimationFrame(tickSess);
@@ -305,26 +315,26 @@
       tickSess();
     } else if (type === 'rsi') {
       var bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      bg.setAttribute('x', '10');
-      bg.setAttribute('y', '12');
-      bg.setAttribute('width', '80');
+      bg.setAttribute('x', '8');
+      bg.setAttribute('y', '14');
+      bg.setAttribute('width', '84');
       bg.setAttribute('height', '8');
       bg.setAttribute('rx', '4');
-      bg.setAttribute('fill', 'rgba(255,255,255,0.08)');
+      bg.setAttribute('fill', 'rgba(168,85,247,0.15)');
       svg.appendChild(bg);
       var fill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      fill.setAttribute('x', '10');
-      fill.setAttribute('y', '12');
+      fill.setAttribute('x', '8');
+      fill.setAttribute('y', '14');
       fill.setAttribute('height', '8');
       fill.setAttribute('rx', '4');
-      fill.setAttribute('fill', '#8b6cff');
+      fill.setAttribute('fill', 'url(#' + uid + ')');
       svg.appendChild(fill);
       var rsiVal = 50;
       function tickRsi() {
         if (!running) return;
-        rsiVal += (Math.random() - 0.5) * 8;
-        rsiVal = Math.max(20, Math.min(80, rsiVal));
-        fill.setAttribute('width', (rsiVal / 100) * 80);
+        rsiVal += (Math.random() - 0.5) * 6;
+        rsiVal = Math.max(25, Math.min(75, rsiVal));
+        fill.setAttribute('width', (rsiVal / 100) * 84);
         requestAnimationFrame(tickRsi);
       }
       tickRsi();
@@ -363,7 +373,7 @@
       div.id = 'ind-' + ind.key;
       div.innerHTML = '<div class="label">' + ind.label + '</div><div class="value">—</div>';
       var wrap = document.createElement('div');
-      wrap.style.marginTop = '4px';
+      wrap.className = 'chart-wrap';
       div.appendChild(wrap);
       indBox.appendChild(div);
       chartAnimators.push(createViz(wrap, ind.type));
@@ -374,7 +384,6 @@
     var countEl = $('progressCount');
     var bottom = $('bottomStatus');
 
-    var stepMs = 420;
     for (var i = 0; i < indicators.length; i++) {
       var num = i + 1;
       status.textContent = 'Взвешиваю всё...';
@@ -383,7 +392,7 @@
       bar.style.width = (num / indicators.length * 100) + '%';
       var el = $('ind-' + indicators[i].key);
       if (el) el.classList.add('show');
-      await sleep(stepMs);
+      await sleep(420);
     }
 
     try {
@@ -405,7 +414,7 @@
       } else if (candles.length >= 3) {
         isDown = candles[candles.length - 1].close < candles[candles.length - 3].close;
       }
-      var chartColor = isDown ? '#ff4d6d' : '#1ee687';
+      var chartColor = isDown ? '#f43f5e' : '#22d3a0';
       indicators.forEach(function (ind) {
         var el = $('ind-' + ind.key);
         if (!el) return;
@@ -416,9 +425,6 @@
         el.querySelector('.value').textContent = val;
         el.querySelector('.value').style.color = chartColor;
         el.querySelectorAll('polyline').forEach(function (p) { p.setAttribute('stroke', chartColor); });
-        el.querySelectorAll('rect').forEach(function (r) {
-          if (r.getAttribute('fill') !== 'rgba(255,255,255,0.08)') r.setAttribute('fill', chartColor);
-        });
       });
       status.textContent = 'Анализ завершён';
       if (bottom) bottom.textContent = 'GPT 6.0 завершил анализ';
