@@ -31,6 +31,7 @@
   var allPairs = [];
   var searchQuery = '';
   var chartAnimators = [];
+  var lastEntryPrice = null;
 
   function $(id) { return document.getElementById(id); }
 
@@ -69,6 +70,11 @@
     if (badge) badge.textContent = userId ? 'ID: ' + userId.slice(-4) : 'Нет доступа';
   }
 
+  function updateTfDisplay() {
+    var el = $('tfValue');
+    if (el) el.textContent = tfLabel();
+  }
+
   function checkAccess() {
     if (!userId) {
       alert('Доступ только по User ID. Введите его в Профиле.');
@@ -102,7 +108,7 @@
     } catch (e) {
       console.error(e);
       var box = $('pairGrid');
-      if (box) box.innerHTML = '<div style="color:var(--ai3d-muted);padding:12px;grid-column:1/-1">Не удалось загрузить пары</div>';
+      if (box) box.innerHTML = '<div style="color:#a8c5d9;padding:12px;grid-column:1/-1">Не удалось загрузить пары</div>';
     }
   }
 
@@ -144,7 +150,7 @@
     var list = getVisiblePairs();
     if (countEl) countEl.textContent = list.length + ' пар в этой категории';
     if (!list.length) {
-      box.innerHTML = '<div style="color:var(--ai3d-muted);padding:12px;text-align:center;grid-column:1/-1">Ничего не найдено</div>';
+      box.innerHTML = '<div style="color:#a8c5d9;padding:12px;text-align:center;grid-column:1/-1">Ничего не найдено</div>';
       return;
     }
     box.innerHTML = list.map(function (p) {
@@ -171,20 +177,23 @@
     }).join('');
   }
 
-  function renderTfs() {
-    var grid = $('tfGrid');
-    if (!grid) return;
-    grid.innerHTML = TIMEFRAMES.map(function (tf) {
+  function openTfPopup() {
+    var overlay = $('tfOverlay');
+    var box = $('tfOptions');
+    if (!overlay || !box) return;
+    box.innerHTML = TIMEFRAMES.map(function (tf) {
       var sel = tf.value === selectedTf ? ' selected' : '';
-      return '<button class="tf-btn' + sel + '" data-tf="' + tf.value + '">' + tf.label + '</button>';
+      return '<div class="tf-opt' + sel + '" data-tf="' + tf.value + '">' + tf.label + '</div>';
     }).join('');
-    grid.querySelectorAll('.tf-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        selectedTf = Number(btn.dataset.tf);
+    box.querySelectorAll('.tf-opt').forEach(function (opt) {
+      opt.addEventListener('click', function () {
+        selectedTf = Number(opt.dataset.tf);
         localStorage.setItem('aiBotSelectedTf', selectedTf);
-        renderTfs();
+        updateTfDisplay();
+        overlay.classList.add('hidden');
       });
     });
+    overlay.classList.remove('hidden');
   }
 
   function tfLabel() {
@@ -194,7 +203,7 @@
 
   function analyzeTicks(candles) {
     if (!candles || candles.length < 3) {
-      return { isDown: Math.random() > 0.5, reason: 'Анализ по тикам' };
+      return { isDown: Math.random() > 0.5, reason: 'Анализ по тикам', entry: null };
     }
     var recent = candles.slice(-6);
     var closes = recent.map(function (c) { return Number(c.close) || 0; });
@@ -214,7 +223,7 @@
     if (upCount > downCount) score += 1;
     var isDown = score < 0;
     var reason = (isDown ? 'Импульс вниз' : 'Импульс вверх') + ' · ' + downCount + '↓/' + upCount + '↑';
-    return { isDown: isDown, reason: reason };
+    return { isDown: isDown, reason: reason, entry: last };
   }
 
   function createViz(container, type) {
@@ -357,6 +366,8 @@
     if (btn) btn.disabled = true;
     var main = $('signalMain');
     var analysis = $('analysisView');
+    var overlay = $('signalOverlay');
+    if (overlay) overlay.classList.add('hidden');
     if (main) main.style.display = 'none';
     if (analysis) analysis.style.display = 'block';
 
@@ -418,6 +429,7 @@
     var result = analyzeTicks(candles);
     var isDown = result.isDown;
     var reason = result.reason;
+    lastEntryPrice = result.entry;
     var chartColor = isDown ? '#ff526d' : '#19e58b';
 
     indicators.forEach(function (ind) {
@@ -438,11 +450,11 @@
     if (status) status.textContent = 'Анализ завершён';
     if (bottom) bottom.textContent = 'GPT 6.0 завершил анализ';
     await sleep(500);
-    showResult(isDown, reason);
+    showResult(isDown, reason, lastEntryPrice);
     if (btn) btn.disabled = false;
   }
 
-  function showResult(isDown, reason) {
+  function showResult(isDown, reason, entryPrice) {
     chartAnimators.forEach(function (s) { if (typeof s === 'function') s(); });
     chartAnimators = [];
     var analysis = $('analysisView');
@@ -460,15 +472,17 @@
     var tfName = tfLabel();
     var pairName = allPairs.find(function (p) { return p.symbol === selectedPair; });
     var pairLabel = pairName ? pairName.display : selectedPair;
+    var priceStr = entryPrice ? entryPrice.toFixed(5).replace(/\.?0+$/, '') : '—';
 
     card.innerHTML =
       '<div class="big-signal ' + cls + '">' +
         '<div class="signal-icon ' + cls + '">' + icon + '</div>' +
-        '<div style="font-size:12px;color:var(--ai3d-muted);margin-bottom:6px">' + pairLabel + '</div>' +
+        '<div style="font-size:12px;color:#a8c5d9;margin-bottom:6px">' + pairLabel + '</div>' +
         '<div class="direction">' + dir + '</div>' +
-        '<div style="margin-top:8px;font-size:13px">Откройте «' + dir + '» на ' + tfName + '</div>' +
+        '<div class="entry-price">Вход: ' + priceStr + '</div>' +
+        '<div style="margin-top:6px;font-size:13px">Откройте «' + dir + '» на ' + tfName + '</div>' +
         '<div class="countdown" id="cd">Войдите за 0:' + String(Math.min(selectedTf, 59)).padStart(2, '0') + '</div>' +
-        '<div style="margin-top:10px;font-size:11px;color:var(--ai3d-muted)">' + (reason || '') + '</div>' +
+        '<div style="margin-top:10px;font-size:11px;color:#a8c5d9">' + (reason || '') + '</div>' +
         '<button class="rescan-btn" id="rescanBtn">Сканировать снова</button>' +
       '</div>';
 
@@ -478,6 +492,7 @@
     if (rescan) {
       rescan.addEventListener('click', function () {
         overlay.classList.add('hidden');
+        getSignal();
       });
     }
 
@@ -500,6 +515,16 @@
     });
   }
 
+  var tfSel = $('tfSelector');
+  if (tfSel) tfSel.addEventListener('click', openTfPopup);
+
+  var tfOverlay = $('tfOverlay');
+  if (tfOverlay) {
+    tfOverlay.addEventListener('click', function (e) {
+      if (e.target === tfOverlay) tfOverlay.classList.add('hidden');
+    });
+  }
+
   var getBtn = $('getSignalBtn');
   if (getBtn) getBtn.addEventListener('click', getSignal);
 
@@ -508,19 +533,19 @@
     saveBtn.addEventListener('click', function () {
       var val = $('userIdInput').value.trim();
       if (!val) {
-        $('profileStatus').innerHTML = '<span class="status-err" style="color:#ff526d">Введите ID</span>';
+        $('profileStatus').innerHTML = '<span style="color:#ff526d">Введите ID</span>';
         return;
       }
       userId = val;
       localStorage.setItem('aiBotUserId', userId);
-      $('profileStatus').innerHTML = '<span class="status-ok" style="color:#19e58b">Сохранено. Доступ открыт.</span>';
+      $('profileStatus').innerHTML = '<span style="color:#19e58b">Сохранено. Доступ открыт.</span>';
       updateUserBadge();
     });
   }
 
   function init() {
     initTelegram();
-    renderTfs();
+    updateTfDisplay();
     loadPayouts();
     var stats = $('todayStats');
     if (stats) stats.innerHTML = 'Сделки: 0<br>Успешные: —<br>Оборот: —';
