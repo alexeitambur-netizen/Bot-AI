@@ -19,15 +19,16 @@ const staticFiles = {
     '/scanner-po.js': 'scanner-po.js',
     '/market-signal.js': 'market-signal.js',
     '/signal-engine.js': 'signal-engine.js',
-    '/ai-bot.js': 'ai-bot.js'
+    '/ai-bot.js': 'ai-bot.js',
+    '/ai-bot-3d.css': 'ai-bot-3d.css'
 };
 const staticTypes = {
     '.html': 'text/html; charset=utf-8',
-    '.js': 'application/javascript; charset=utf-8'
+    '.js': 'application/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8'
 };
 
-// Читаем файлы на каждый запрос — без кэша, чтобы обновления видны сразу
-app.get(['/', '/index.html', '/scanner-po.js', '/market-signal.js', '/signal-engine.js', '/ai-bot.js'], function (req, res) {
+app.get(['/', '/index.html', '/scanner-po.js', '/market-signal.js', '/signal-engine.js', '/ai-bot.js', '/ai-bot-3d.css'], function (req, res) {
     const file = staticFiles[req.path] || 'index.html';
     const ext = path.extname(file);
     const filePath = path.join(__dirname, file);
