@@ -33,6 +33,7 @@
   var chartAnimators = [];
   var lastEntryPrice = null;
   var countdownTimer = null;
+  var signalCache = {};
 
   function $(id) { return document.getElementById(id); }
 
@@ -210,15 +211,19 @@
     return next;
   }
 
+  function cacheKey() {
+    return selectedPair + '|' + selectedTf + '|' + nextCandleOpenMs();
+  }
+
   function analyzeTicks(candles) {
     if (!candles || candles.length < 3) {
       return { isDown: Math.random() > 0.5, reason: 'Анализ по тикам', entry: null };
     }
-    var recent = candles.slice(-6);
+    var recent = candles.slice(-8);
     var closes = recent.map(function (c) { return Number(c.close) || 0; });
     var last = closes[closes.length - 1];
     var prev = closes[closes.length - 2] || last;
-    var older = closes[Math.max(0, closes.length - 4)] || prev;
+    var older = closes[Math.max(0, closes.length - 5)] || prev;
     var downCount = 0;
     var upCount = 0;
     for (var i = 1; i < closes.length; i++) {
@@ -226,10 +231,10 @@
       else if (closes[i] > closes[i - 1]) upCount++;
     }
     var score = 0;
-    if (last < prev) score -= 2; else score += 2;
-    if (last < older) score -= 1; else score += 1;
-    if (downCount > upCount) score -= 1;
-    if (upCount > downCount) score += 1;
+    if (last < prev) score -= 3; else score += 3;
+    if (last < older) score -= 2; else score += 2;
+    if (downCount > upCount + 1) score -= 2;
+    if (upCount > downCount + 1) score += 2;
     var isDown = score < 0;
     var reason = (isDown ? 'Импульс вниз' : 'Импульс вверх') + ' · ' + downCount + '↓/' + upCount + '↑';
     return { isDown: isDown, reason: reason, entry: last };
@@ -425,18 +430,28 @@
       await sleep(400);
     }
 
-    var candles = [];
-    try {
-      var candlesRes = await fetch('/api/candles?pair=' + encodeURIComponent(selectedPair) + '&period=' + selectedTf);
-      if (candlesRes.ok) {
-        var candleData = await candlesRes.json();
-        candles = candleData.candles || [];
+    var key = cacheKey();
+    var cached = signalCache[key];
+    var result;
+
+    if (cached && cached.expires > Date.now()) {
+      result = cached;
+    } else {
+      var candles = [];
+      try {
+        var candlesRes = await fetch('/api/candles?pair=' + encodeURIComponent(selectedPair) + '&period=' + selectedTf);
+        if (candlesRes.ok) {
+          var candleData = await candlesRes.json();
+          candles = candleData.candles || [];
+        }
+      } catch (e) {
+        console.error('candles fetch failed', e);
       }
-    } catch (e) {
-      console.error('candles fetch failed', e);
+      result = analyzeTicks(candles);
+      result.expires = nextCandleOpenMs();
+      signalCache[key] = result;
     }
 
-    var result = analyzeTicks(candles);
     var isDown = result.isDown;
     var reason = result.reason;
     lastEntryPrice = result.entry;
