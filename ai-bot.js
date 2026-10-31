@@ -24,9 +24,9 @@
     { id: 'indices', label: 'Индексы' }
   ];
 
-  var selectedPair = 'EURUSD_otc';
-  var selectedTf = 5;
-  var selectedCat = 'currencies';
+  var selectedPair = localStorage.getItem('aiBotSelectedPair') || 'EURUSD_otc';
+  var selectedTf = Number(localStorage.getItem('aiBotSelectedTf')) || 5;
+  var selectedCat = localStorage.getItem('aiBotSelectedCat') || 'currencies';
   var userId = localStorage.getItem('aiBotUserId') || '';
   var allPairs = [];
   var searchQuery = '';
@@ -102,7 +102,7 @@
     } catch (e) {
       console.error(e);
       var box = $('pairGrid');
-      if (box) box.innerHTML = '<div style="color:var(--muted);padding:12px;grid-column:1/-1">Не удалось загрузить пары</div>';
+      if (box) box.innerHTML = '<div style="color:var(--ai3d-muted);padding:12px;grid-column:1/-1">Не удалось загрузить пары</div>';
     }
   }
 
@@ -117,6 +117,7 @@
     box.querySelectorAll('button').forEach(function (btn) {
       btn.addEventListener('click', function () {
         selectedCat = btn.dataset.cat;
+        localStorage.setItem('aiBotSelectedCat', selectedCat);
         renderCatTabs();
         renderPairs();
       });
@@ -143,7 +144,7 @@
     var list = getVisiblePairs();
     if (countEl) countEl.textContent = list.length + ' пар в этой категории';
     if (!list.length) {
-      box.innerHTML = '<div style="color:var(--muted);padding:12px;text-align:center;grid-column:1/-1">Ничего не найдено</div>';
+      box.innerHTML = '<div style="color:var(--ai3d-muted);padding:12px;text-align:center;grid-column:1/-1">Ничего не найдено</div>';
       return;
     }
     box.innerHTML = list.map(function (p) {
@@ -155,6 +156,7 @@
     box.querySelectorAll('.pair-card').forEach(function (card) {
       card.addEventListener('click', function () {
         selectedPair = card.dataset.symbol;
+        localStorage.setItem('aiBotSelectedPair', selectedPair);
         renderPairs();
       });
     });
@@ -179,6 +181,7 @@
     grid.querySelectorAll('.tf-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         selectedTf = Number(btn.dataset.tf);
+        localStorage.setItem('aiBotSelectedTf', selectedTf);
         renderTfs();
       });
     });
@@ -233,11 +236,11 @@
     grad.setAttribute('y2', '1');
     var s1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
     s1.setAttribute('offset', '0%');
-    s1.setAttribute('stop-color', '#a855f7');
-    s1.setAttribute('stop-opacity', '0.6');
+    s1.setAttribute('stop-color', '#19e58b');
+    s1.setAttribute('stop-opacity', '0.5');
     var s2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
     s2.setAttribute('offset', '100%');
-    s2.setAttribute('stop-color', '#a855f7');
+    s2.setAttribute('stop-color', '#19e58b');
     s2.setAttribute('stop-opacity', '0');
     grad.appendChild(s1);
     grad.appendChild(s2);
@@ -257,7 +260,7 @@
       svg.appendChild(area);
       var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
       poly.setAttribute('fill', 'none');
-      poly.setAttribute('stroke', '#c084fc');
+      poly.setAttribute('stroke', '#36d8f2');
       poly.setAttribute('stroke-width', '1.8');
       poly.setAttribute('stroke-linecap', 'round');
       svg.appendChild(poly);
@@ -280,7 +283,7 @@
         rect.setAttribute('x', 3 + b * 9.6);
         rect.setAttribute('width', 6);
         rect.setAttribute('rx', '2');
-        rect.setAttribute('fill', '#a855f7');
+        rect.setAttribute('fill', '#19e58b');
         svg.appendChild(rect);
         bars.push(rect);
       }
@@ -300,12 +303,12 @@
       circle.setAttribute('cy', '18');
       circle.setAttribute('r', '12');
       circle.setAttribute('fill', 'none');
-      circle.setAttribute('stroke', '#a855f7');
+      circle.setAttribute('stroke', '#36d8f2');
       circle.setAttribute('stroke-width', '2');
       svg.appendChild(circle);
       var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       dot.setAttribute('r', '4');
-      dot.setAttribute('fill', '#c084fc');
+      dot.setAttribute('fill', '#19e58b');
       svg.appendChild(dot);
       var angle = 0;
       function tickSess() {
@@ -323,14 +326,14 @@
       bg.setAttribute('width', '84');
       bg.setAttribute('height', '8');
       bg.setAttribute('rx', '4');
-      bg.setAttribute('fill', 'rgba(168,85,247,0.15)');
+      bg.setAttribute('fill', 'rgba(255,255,255,0.08)');
       svg.appendChild(bg);
       var fill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       fill.setAttribute('x', '8');
       fill.setAttribute('y', '14');
       fill.setAttribute('height', '8');
       fill.setAttribute('rx', '4');
-      fill.setAttribute('fill', '#a855f7');
+      fill.setAttribute('fill', '#19e58b');
       svg.appendChild(fill);
       var rsiVal = 50;
       function tickRsi() {
@@ -354,10 +357,8 @@
     if (btn) btn.disabled = true;
     var main = $('signalMain');
     var analysis = $('analysisView');
-    var result = $('signalResult');
     if (main) main.style.display = 'none';
     if (analysis) analysis.style.display = 'block';
-    if (result) result.style.display = 'none';
 
     var tfName = tfLabel();
     var indicators = [
@@ -417,7 +418,7 @@
     var result = analyzeTicks(candles);
     var isDown = result.isDown;
     var reason = result.reason;
-    var chartColor = isDown ? '#f43f5e' : '#22d3a0';
+    var chartColor = isDown ? '#ff526d' : '#19e58b';
 
     indicators.forEach(function (ind) {
       var el = $('ind-' + ind.key);
@@ -446,25 +447,40 @@
     chartAnimators = [];
     var analysis = $('analysisView');
     if (analysis) analysis.style.display = 'none';
-    var box = $('signalResult');
-    if (!box) return;
-    box.style.display = 'block';
+    var main = $('signalMain');
+    if (main) main.style.display = 'block';
+
+    var overlay = $('signalOverlay');
+    var card = $('signalCard');
+    if (!overlay || !card) return;
+
     var dir = isDown ? 'ВНИЗ' : 'ВВЕРХ';
     var cls = isDown ? 'down' : 'up';
     var icon = isDown ? '↓' : '↑';
     var tfName = tfLabel();
     var pairName = allPairs.find(function (p) { return p.symbol === selectedPair; });
     var pairLabel = pairName ? pairName.display : selectedPair;
-    box.innerHTML =
+
+    card.innerHTML =
       '<div class="big-signal ' + cls + '">' +
         '<div class="signal-icon ' + cls + '">' + icon + '</div>' +
-        '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">' + pairLabel + '</div>' +
+        '<div style="font-size:12px;color:var(--ai3d-muted);margin-bottom:6px">' + pairLabel + '</div>' +
         '<div class="direction">' + dir + '</div>' +
         '<div style="margin-top:8px;font-size:13px">Откройте «' + dir + '» на ' + tfName + '</div>' +
         '<div class="countdown" id="cd">Войдите за 0:' + String(Math.min(selectedTf, 59)).padStart(2, '0') + '</div>' +
-        '<div style="margin-top:10px;font-size:11px;color:var(--muted)">' + (reason || '') + '</div>' +
-      '</div>' +
-      '<button class="get-signal" onclick="location.reload()">Новый сигнал</button>';
+        '<div style="margin-top:10px;font-size:11px;color:var(--ai3d-muted)">' + (reason || '') + '</div>' +
+        '<button class="rescan-btn" id="rescanBtn">Сканировать снова</button>' +
+      '</div>';
+
+    overlay.classList.remove('hidden');
+
+    var rescan = $('rescanBtn');
+    if (rescan) {
+      rescan.addEventListener('click', function () {
+        overlay.classList.add('hidden');
+      });
+    }
+
     var left = Math.min(selectedTf, 59);
     var cd = $('cd');
     var timer = setInterval(function () {
@@ -492,12 +508,12 @@
     saveBtn.addEventListener('click', function () {
       var val = $('userIdInput').value.trim();
       if (!val) {
-        $('profileStatus').innerHTML = '<span class="status-err">Введите ID</span>';
+        $('profileStatus').innerHTML = '<span class="status-err" style="color:#ff526d">Введите ID</span>';
         return;
       }
       userId = val;
       localStorage.setItem('aiBotUserId', userId);
-      $('profileStatus').innerHTML = '<span class="status-ok">Сохранено. Доступ открыт.</span>';
+      $('profileStatus').innerHTML = '<span class="status-ok" style="color:#19e58b">Сохранено. Доступ открыт.</span>';
       updateUserBadge();
     });
   }
