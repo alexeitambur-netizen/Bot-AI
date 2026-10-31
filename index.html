@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>AI Bot — Chat GPT Trade Bot</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: #0a0e17;
+      --card: #121826;
+      --card2: #1a2234;
+      --green: #00d26a;
+      --red: #ff4d4d;
+      --purple: #7c5cfc;
+      --text: #e8eaf0;
+      --muted: #8b93a7;
+      --border: #2a3348;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      padding-bottom: 70px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #0d1220;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header .title { font-weight: 700; font-size: 16px; }
+    .header .live { background: #ff3b5c; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-right: 8px; }
+    .tabs-nav {
+      display: flex;
+      background: #0d1220;
+      border-bottom: 1px solid var(--border);
+    }
+    .tabs-nav button {
+      flex: 1;
+      padding: 12px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .tabs-nav button.active { color: #fff; border-bottom: 2px solid var(--purple); }
+    .page { display: none; padding: 16px; }
+    .page.active { display: block; }
+    .pair-card, .signal-card, .analysis-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+    }
+    .pair-row {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+    .pair-chip {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      min-width: 110px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .pair-chip.selected { border-color: var(--green); background: #0f2a1e; }
+    .pair-chip .payout { color: var(--green); font-weight: 700; }
+    .tf-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .tf-btn {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 4px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .tf-btn.selected { background: var(--green); color: #000; border-color: var(--green); font-weight: 700; }
+    .get-signal {
+      width: 100%;
+      background: linear-gradient(90deg, #00d26a, #00b85c);
+      color: #000;
+      border: none;
+      padding: 16px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .get-signal:disabled { opacity: 0.5; }
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 12px 0;
+    }
+    .indicator {
+      background: var(--card2);
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 13px;
+    }
+    .indicator .label { color: var(--muted); font-size: 11px; }
+    .indicator .value { font-weight: 600; margin-top: 4px; }
+    .big-signal {
+      text-align: center;
+      padding: 30px 16px;
+      border-radius: 20px;
+      margin: 16px 0;
+    }
+    .big-signal.down {
+      background: linear-gradient(180deg, #2a0a0a, #1a0505);
+      border: 1px solid #ff4d4d44;
+    }
+    .big-signal.up {
+      background: linear-gradient(180deg, #0a2a1a, #051a0d);
+      border: 1px solid #00d26a44;
+    }
+    .big-signal .direction {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: 2px;
+    }
+    .big-signal.down .direction { color: var(--red); }
+    .big-signal.up .direction { color: var(--green); }
+    .countdown { font-size: 14px; color: var(--muted); margin-top: 8px; }
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #0d1220;
+      border-top: 1px solid var(--border);
+      display: flex;
+      padding: 8px 0 env(safe-area-inset-bottom);
+    }
+    .bottom-nav button {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 8px;
+      cursor: pointer;
+    }
+    .bottom-nav button.active { color: #fff; }
+    .profile-box {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 20px;
+    }
+    .profile-box input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card2);
+      color: #fff;
+      margin: 8px 0;
+    }
+    .status-ok { color: var(--green); }
+    .status-err { color: var(--red); }
+    .progress {
+      height: 4px;
+      background: #2a3348;
+      border-radius: 2px;
+      margin: 8px 0;
+      overflow: hidden;
+    }
+    .progress > div {
+      height: 100%;
+      background: linear-gradient(90deg, var(--purple), #a78bfa);
+      width: 0%;
+      transition: width 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div><span class="live">LIVE</span><span class="title">Chat GPT Trade Bot</span></div>
+    <div id="userBadge" style="font-size:12px;color:var(--muted)"></div>
+  </div>
+
+  <div class="tabs-nav">
+    <button data-page="today" class="active">Сегодня</button>
+    <button data-page="signal">Сигнал</button>
+    <button data-page="profile">Профиль</button>
+  </div>
+
+  <div id="page-today" class="page active">
+    <div class="pair-card">
+      <h3 style="margin-bottom:12px">Статистика за сегодня</h3>
+      <div id="todayStats">Загрузка...</div>
+    </div>
+    <div class="pair-card">
+      <div>Высокий процент выплаты на парах</div>
+      <div id="hotPairs" class="pair-row" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <div id="page-signal" class="page">
+    <div id="signalMain">
+      <div class="pair-card">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Выберите пару</div>
+        <div id="pairList" class="pair-row"></div>
+        <div style="font-size:13px;color:var(--muted);margin:12px 0 8px">Время сделки</div>
+        <div class="tf-grid" id="tfGrid"></div>
+        <button class="get-signal" id="getSignalBtn">⚙️ Получить сигнал</button>
+      </div>
+    </div>
+    <div id="analysisView" style="display:none">
+      <div class="analysis-card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--purple);display:flex;align-items:center;justify-content:center">✨</div>
+          <div>
+            <div style="font-weight:700">Анализ...</div>
+            <div style="font-size:12px;color:var(--muted)" id="analysisStatus">GPT 6.0 анализирует...</div>
+          </div>
+        </div>
+        <div class="progress"><div id="analysisBar"></div></div>
+        <div class="analysis-grid" id="indicators"></div>
+      </div>
+    </div>
+    <div id="signalResult" style="display:none"></div>
+  </div>
+
+  <div id="page-profile" class="page">
+    <div class="profile-box">
+      <h3>Профиль</h3>
+      <p style="color:var(--muted);font-size:14px;margin:8px 0">Доступ к сигналам только по User ID</p>
+      <div id="tgAuto" style="margin:12px 0;font-size:14px"></div>
+      <label style="font-size:13px;color:var(--muted)">User ID (Telegram)</label>
+      <input type="text" id="userIdInput" placeholder="Введите ваш Telegram ID">
+      <button class="get-signal" id="saveIdBtn" style="margin-top:8px">Сохранить</button>
+      <div id="profileStatus" style="margin-top:12px;font-size:14px"></div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button data-page="today">Главная</button>
+    <button data-page="signal" class="active">Сигнал</button>
+    <button data-page="profile">Профиль</button>
+  </div>
+
+  <script src="/signal-engine.js"></script>
+  <script src="/ai-bot.js"></script>
+</body>
+</html>
