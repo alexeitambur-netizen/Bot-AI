@@ -190,28 +190,27 @@
   }
 
   function analyzeTicks(candles) {
-    if (!candles || candles.length < 4) return { isDown: Math.random() > 0.5, reason: 'Мало данных' };
-    var recent = candles.slice(-8);
-    var closes = recent.map(function (c) { return c.close; });
+    if (!candles || candles.length < 3) {
+      return { isDown: Math.random() > 0.5, reason: 'Анализ по тикам' };
+    }
+    var recent = candles.slice(-6);
+    var closes = recent.map(function (c) { return Number(c.close) || 0; });
     var last = closes[closes.length - 1];
-    var prev = closes[closes.length - 2];
-    var prev3 = closes[Math.max(0, closes.length - 4)];
-    var bearish = 0, bullish = 0;
-    recent.slice(-5).forEach(function (c) {
-      if (c.close < c.open) bearish++;
-      else if (c.close > c.open) bullish++;
-    });
-    var sma = closes.reduce(function (a, b) { return a + b; }, 0) / closes.length;
-    var momentum = last - prev3;
+    var prev = closes[closes.length - 2] || last;
+    var older = closes[Math.max(0, closes.length - 4)] || prev;
+    var downCount = 0;
+    var upCount = 0;
+    for (var i = 1; i < closes.length; i++) {
+      if (closes[i] < closes[i - 1]) downCount++;
+      else if (closes[i] > closes[i - 1]) upCount++;
+    }
     var score = 0;
-    if (last < prev) score -= 1; else score += 1;
-    if (momentum < 0) score -= 1; else score += 1;
-    if (last < sma) score -= 1; else score += 1;
-    if (bearish > bullish) score -= 1;
-    if (bullish > bearish) score += 1;
+    if (last < prev) score -= 2; else score += 2;
+    if (last < older) score -= 1; else score += 1;
+    if (downCount > upCount) score -= 1;
+    if (upCount > downCount) score += 1;
     var isDown = score < 0;
-    if (score === 0) isDown = last < prev;
-    var reason = (isDown ? 'Импульс вниз' : 'Импульс вверх') + ' · ' + bearish + '↓/' + bullish + '↑';
+    var reason = (isDown ? 'Импульс вниз' : 'Импульс вверх') + ' · ' + downCount + '↓/' + upCount + '↑';
     return { isDown: isDown, reason: reason };
   }
 
@@ -261,17 +260,7 @@
       poly.setAttribute('stroke', '#c084fc');
       poly.setAttribute('stroke-width', '1.8');
       poly.setAttribute('stroke-linecap', 'round');
-      poly.setAttribute('filter', 'drop-shadow(0 0 3px #a855f7)');
       svg.appendChild(poly);
-      var poly2 = null;
-      if (type === 'ma') {
-        poly2 = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-        poly2.setAttribute('fill', 'none');
-        poly2.setAttribute('stroke', '#f43f5e');
-        poly2.setAttribute('stroke-width', '1.2');
-        poly2.setAttribute('stroke-dasharray', '3,2');
-        svg.appendChild(poly2);
-      }
       function tickLine() {
         if (!running) return;
         pts.shift();
@@ -279,14 +268,8 @@
         var ny = last.y + (Math.random() - 0.5) * 5;
         ny = Math.max(4, Math.min(32, ny));
         pts.push({ x: last.x + 5.6, y: ny });
-        var linePts = pts.map(function (p) { return p.x + ',' + p.y; }).join(' ');
-        poly.setAttribute('points', linePts);
-        var areaPts = pts.map(function (p) { return p.x + ',' + p.y; }).join(' ') + ' 100,36 0,36';
-        area.setAttribute('points', areaPts);
-        if (poly2) {
-          var pts2 = pts.map(function (p, i) { return p.x + ',' + Math.max(4, Math.min(32, p.y + Math.sin(i * 0.4) * 4)); });
-          poly2.setAttribute('points', pts2.join(' '));
-        }
+        poly.setAttribute('points', pts.map(function (p) { return p.x + ',' + p.y; }).join(' '));
+        area.setAttribute('points', pts.map(function (p) { return p.x + ',' + p.y; }).join(' ') + ' 100,36 0,36');
         requestAnimationFrame(tickLine);
       }
       tickLine();
@@ -295,18 +278,16 @@
       for (var b = 0; b < 10; b++) {
         var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', 3 + b * 9.6);
-        rect.setAttribute('width', 6');
+        rect.setAttribute('width', 6);
         rect.setAttribute('rx', '2');
         rect.setAttribute('fill', '#a855f7');
-        rect.setAttribute('opacity', '0.9');
         svg.appendChild(rect);
         bars.push(rect);
       }
       function tickBars() {
         if (!running) return;
-        bars.forEach(function (rect, i) {
-          var h = 6 + Math.sin(Date.now() / 200 + i) * 10 + Math.random() * 8;
-          h = Math.max(4, Math.min(28, h));
+        bars.forEach(function (rect) {
+          var h = 4 + Math.random() * 24;
           rect.setAttribute('height', h);
           rect.setAttribute('y', 36 - h);
         });
@@ -321,21 +302,17 @@
       circle.setAttribute('fill', 'none');
       circle.setAttribute('stroke', '#a855f7');
       circle.setAttribute('stroke-width', '2');
-      circle.setAttribute('opacity', '0.5');
       svg.appendChild(circle);
       var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       dot.setAttribute('r', '4');
       dot.setAttribute('fill', '#c084fc');
-      dot.setAttribute('filter', 'drop-shadow(0 0 4px #a855f7)');
       svg.appendChild(dot);
       var angle = 0;
       function tickSess() {
         if (!running) return;
         angle += 0.06;
-        var cx = 50 + Math.cos(angle) * 12;
-        var cy = 18 + Math.sin(angle) * 12;
-        dot.setAttribute('cx', cx);
-        dot.setAttribute('cy', cy);
+        dot.setAttribute('cx', 50 + Math.cos(angle) * 12);
+        dot.setAttribute('cy', 18 + Math.sin(angle) * 12);
         requestAnimationFrame(tickSess);
       }
       tickSess();
@@ -353,7 +330,7 @@
       fill.setAttribute('y', '14');
       fill.setAttribute('height', '8');
       fill.setAttribute('rx', '4');
-      fill.setAttribute('fill', 'url(#' + uid + ')');
+      fill.setAttribute('fill', '#a855f7');
       svg.appendChild(fill);
       var rsiVal = 50;
       function tickRsi() {
@@ -371,13 +348,16 @@
 
   async function getSignal() {
     if (!checkAccess()) return;
-    chartAnimators.forEach(function (s) { s(); });
+    chartAnimators.forEach(function (s) { if (typeof s === 'function') s(); });
     chartAnimators = [];
     var btn = $('getSignalBtn');
-    btn.disabled = true;
-    $('signalMain').style.display = 'none';
-    $('analysisView').style.display = 'block';
-    $('signalResult').style.display = 'none';
+    if (btn) btn.disabled = true;
+    var main = $('signalMain');
+    var analysis = $('analysisView');
+    var result = $('signalResult');
+    if (main) main.style.display = 'none';
+    if (analysis) analysis.style.display = 'block';
+    if (result) result.style.display = 'none';
 
     var tfName = tfLabel();
     var indicators = [
@@ -392,18 +372,20 @@
     ];
 
     var indBox = $('indicators');
-    indBox.innerHTML = '';
-    indicators.forEach(function (ind) {
-      var div = document.createElement('div');
-      div.className = 'indicator';
-      div.id = 'ind-' + ind.key;
-      div.innerHTML = '<div class="label">' + ind.label + '</div><div class="value">—</div>';
-      var wrap = document.createElement('div');
-      wrap.className = 'chart-wrap';
-      div.appendChild(wrap);
-      indBox.appendChild(div);
-      chartAnimators.push(createViz(wrap, ind.type));
-    });
+    if (indBox) {
+      indBox.innerHTML = '';
+      indicators.forEach(function (ind) {
+        var div = document.createElement('div');
+        div.className = 'indicator';
+        div.id = 'ind-' + ind.key;
+        div.innerHTML = '<div class="label">' + ind.label + '</div><div class="value">—</div>';
+        var wrap = document.createElement('div');
+        wrap.className = 'chart-wrap';
+        div.appendChild(wrap);
+        indBox.appendChild(div);
+        chartAnimators.push(createViz(wrap, ind.type));
+      });
+    }
 
     var bar = $('analysisBar');
     var status = $('analysisStatus');
@@ -412,51 +394,60 @@
 
     for (var i = 0; i < indicators.length; i++) {
       var num = i + 1;
-      status.textContent = 'Взвешиваю всё...';
+      if (status) status.textContent = 'Взвешиваю всё...';
       if (bottom) bottom.textContent = 'GPT 6.0 анализирует... ' + num + ' из ' + indicators.length;
       if (countEl) countEl.textContent = num + ' из ' + indicators.length;
-      bar.style.width = (num / indicators.length * 100) + '%';
+      if (bar) bar.style.width = (num / indicators.length * 100) + '%';
       var el = $('ind-' + indicators[i].key);
       if (el) el.classList.add('show');
-      await sleep(420);
+      await sleep(400);
     }
 
+    var candles = [];
     try {
       var candlesRes = await fetch('/api/candles?pair=' + encodeURIComponent(selectedPair) + '&period=' + selectedTf);
-      var candleData = await candlesRes.json();
-      var candles = candleData.candles || [];
-      var result = analyzeTicks(candles);
-      var isDown = result.isDown;
-      var reason = result.reason;
-      var chartColor = isDown ? '#f43f5e' : '#22d3a0';
-      indicators.forEach(function (ind) {
-        var el = $('ind-' + ind.key);
-        if (!el) return;
-        var val = isDown ? 'Вниз' : 'Вверх';
-        if (ind.key === 'rsi') val = isDown ? '38' : '62';
-        if (ind.key === 'support') val = isDown ? 'слабая' : 'сильная';
-        if (ind.key === 'session') val = isDown ? 'азиатская' : 'европейская';
-        el.querySelector('.value').textContent = val;
-        el.querySelector('.value').style.color = chartColor;
-        el.querySelectorAll('polyline').forEach(function (p) { p.setAttribute('stroke', chartColor); });
-      });
-      status.textContent = 'Анализ завершён';
-      if (bottom) bottom.textContent = 'GPT 6.0 завершил анализ';
-      await sleep(600);
-      showResult(isDown, reason);
+      if (candlesRes.ok) {
+        var candleData = await candlesRes.json();
+        candles = candleData.candles || [];
+      }
     } catch (e) {
-      status.textContent = 'Ошибка получения данных';
-      console.error(e);
-    } finally {
-      btn.disabled = false;
+      console.error('candles fetch failed', e);
     }
+
+    var result = analyzeTicks(candles);
+    var isDown = result.isDown;
+    var reason = result.reason;
+    var chartColor = isDown ? '#f43f5e' : '#22d3a0';
+
+    indicators.forEach(function (ind) {
+      var el = $('ind-' + ind.key);
+      if (!el) return;
+      var val = isDown ? 'Вниз' : 'Вверх';
+      if (ind.key === 'rsi') val = isDown ? '38' : '62';
+      if (ind.key === 'support') val = isDown ? 'слабая' : 'сильная';
+      if (ind.key === 'session') val = isDown ? 'азиатская' : 'европейская';
+      var valueEl = el.querySelector('.value');
+      if (valueEl) {
+        valueEl.textContent = val;
+        valueEl.style.color = chartColor;
+      }
+      el.querySelectorAll('polyline').forEach(function (p) { p.setAttribute('stroke', chartColor); });
+    });
+
+    if (status) status.textContent = 'Анализ завершён';
+    if (bottom) bottom.textContent = 'GPT 6.0 завершил анализ';
+    await sleep(500);
+    showResult(isDown, reason);
+    if (btn) btn.disabled = false;
   }
 
   function showResult(isDown, reason) {
-    chartAnimators.forEach(function (s) { s(); });
+    chartAnimators.forEach(function (s) { if (typeof s === 'function') s(); });
     chartAnimators = [];
-    $('analysisView').style.display = 'none';
+    var analysis = $('analysisView');
+    if (analysis) analysis.style.display = 'none';
     var box = $('signalResult');
+    if (!box) return;
     box.style.display = 'block';
     var dir = isDown ? 'ВНИЗ' : 'ВВЕРХ';
     var cls = isDown ? 'down' : 'up';
@@ -493,19 +484,23 @@
     });
   }
 
-  $('getSignalBtn').addEventListener('click', getSignal);
+  var getBtn = $('getSignalBtn');
+  if (getBtn) getBtn.addEventListener('click', getSignal);
 
-  $('saveIdBtn').addEventListener('click', function () {
-    var val = $('userIdInput').value.trim();
-    if (!val) {
-      $('profileStatus').innerHTML = '<span class="status-err">Введите ID</span>';
-      return;
-    }
-    userId = val;
-    localStorage.setItem('aiBotUserId', userId);
-    $('profileStatus').innerHTML = '<span class="status-ok">Сохранено. Доступ открыт.</span>';
-    updateUserBadge();
-  });
+  var saveBtn = $('saveIdBtn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', function () {
+      var val = $('userIdInput').value.trim();
+      if (!val) {
+        $('profileStatus').innerHTML = '<span class="status-err">Введите ID</span>';
+        return;
+      }
+      userId = val;
+      localStorage.setItem('aiBotUserId', userId);
+      $('profileStatus').innerHTML = '<span class="status-ok">Сохранено. Доступ открыт.</span>';
+      updateUserBadge();
+    });
+  }
 
   function init() {
     initTelegram();
