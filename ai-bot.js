@@ -114,7 +114,6 @@
       });
       renderCatTabs();
       renderPairs();
-      renderHot();
     } catch (e) {
       console.error(e);
       var box = $('pairGrid');
@@ -176,15 +175,6 @@
         renderPairs();
       });
     });
-  }
-
-  function renderHot() {
-    var box = $('hotPairs');
-    if (!box) return;
-    var hot = allPairs.filter(function (p) { return p.payout >= 85; }).slice(0, 6);
-    box.innerHTML = hot.map(function (p) {
-      return '<div class="pair-card"><div class="name">' + p.display + '</div><div class="payout">' + p.payout + '%</div></div>';
-    }).join('');
   }
 
   function openTfPopup() {
@@ -591,8 +581,6 @@
     initTelegram();
     updateTfDisplay();
     loadPayouts();
-    var stats = $('todayStats');
-    if (stats) stats.innerHTML = 'Сделки: 0<br>Успешные: —<br>Оборот: —';
     if (userId === ADMIN_ID) {
       showPage('signal');
     } else {
