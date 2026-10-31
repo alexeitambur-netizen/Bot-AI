@@ -25,17 +25,22 @@ const staticTypes = {
     '.html': 'text/html; charset=utf-8',
     '.js': 'application/javascript; charset=utf-8'
 };
-const staticCache = {};
-Object.keys(staticFiles).forEach(function (route) {
-    const file = staticFiles[route];
-    staticCache[file] = fs.readFileSync(path.join(__dirname, file));
-});
+
+// Читаем файлы на каждый запрос — без кэша, чтобы обновления видны сразу
 app.get(['/', '/index.html', '/scanner-po.js', '/market-signal.js', '/signal-engine.js', '/ai-bot.js'], function (req, res) {
     const file = staticFiles[req.path] || 'index.html';
     const ext = path.extname(file);
-    res.setHeader('Content-Type', staticTypes[ext] || 'text/plain; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-store');
-    res.send(staticCache[file]);
+    const filePath = path.join(__dirname, file);
+    try {
+        const content = fs.readFileSync(filePath);
+        res.setHeader('Content-Type', staticTypes[ext] || 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.send(content);
+    } catch (e) {
+        res.status(404).send('File not found');
+    }
 });
 
 function log(message, type) {
