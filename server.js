@@ -18,7 +18,8 @@ const staticFiles = {
     '/index.html': 'index.html',
     '/scanner-po.js': 'scanner-po.js',
     '/market-signal.js': 'market-signal.js',
-    '/signal-engine.js': 'signal-engine.js'
+    '/signal-engine.js': 'signal-engine.js',
+    '/ai-bot.js': 'ai-bot.js'
 };
 const staticTypes = {
     '.html': 'text/html; charset=utf-8',
@@ -29,7 +30,7 @@ Object.keys(staticFiles).forEach(function (route) {
     const file = staticFiles[route];
     staticCache[file] = fs.readFileSync(path.join(__dirname, file));
 });
-app.get(['/', '/index.html', '/scanner-po.js', '/market-signal.js', '/signal-engine.js'], function (req, res) {
+app.get(['/', '/index.html', '/scanner-po.js', '/market-signal.js', '/signal-engine.js', '/ai-bot.js'], function (req, res) {
     const file = staticFiles[req.path] || 'index.html';
     const ext = path.extname(file);
     res.setHeader('Content-Type', staticTypes[ext] || 'text/plain; charset=utf-8');
@@ -119,9 +120,9 @@ if (BOT_TOKEN) {
     const { Telegraf, Markup } = require('telegraf');
     bot = new Telegraf(BOT_TOKEN);
     bot.start(async function (ctx) {
-        const text = 'Bot AI. Только сканер котировок Pocket Option. Открой приложение и выбери пару.';
+        const text = 'Bot AI. Сканер и AI сигналы Pocket Option. Открой приложение.';
         const rows = [];
-        if (WEBAPP_URL) rows.push([Markup.button.webApp('Открыть сканер', WEBAPP_URL)]);
+        if (WEBAPP_URL) rows.push([Markup.button.webApp('Открыть AI Bot', WEBAPP_URL)]);
         await ctx.reply(text, rows.length ? Markup.inlineKeyboard(rows) : undefined);
     });
     bot.command('myid', function (ctx) {
@@ -129,8 +130,8 @@ if (BOT_TOKEN) {
     });
     bot.command('scanner', async function (ctx) {
         if (!WEBAPP_URL) return ctx.reply('Задай WEBAPP_URL на сервере — ссылка на приложение.');
-        await ctx.reply('Сканер котировок', Markup.inlineKeyboard([
-            [Markup.button.webApp('Открыть сканер', WEBAPP_URL)]
+        await ctx.reply('AI Bot', Markup.inlineKeyboard([
+            [Markup.button.webApp('Открыть AI Bot', WEBAPP_URL)]
         ]));
     });
     bot.launch().then(function () { log('Telegram бот запущен', 'BOT'); }).catch(function (err) {
