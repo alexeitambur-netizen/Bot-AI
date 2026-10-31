@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>AI Bot — Chat GPT Trade Bot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/ai-bot-3d.css?v=16">
+  <link rel="stylesheet" href="/ai-bot-3d.css?v=17">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     body {
@@ -220,21 +220,10 @@
     <div id="userBadge" style="font-size:11px;color:#a8c5d9"></div>
   </div>
   <div class="tabs-nav">
-    <button data-page="today" class="active">Сегодня</button>
-    <button data-page="signal">Сигнал</button>
+    <button data-page="signal" class="active">Сигнал</button>
     <button data-page="profile">Профиль</button>
   </div>
-  <div id="page-today" class="page active">
-    <div class="ai3d-panel">
-      <h3 style="margin-bottom:10px;font-size:15px;color:#fff">Статистика за сегодня</h3>
-      <div id="todayStats" style="color:#e8f6ff">Загрузка...</div>
-    </div>
-    <div class="ai3d-panel">
-      <div style="font-size:13px;margin-bottom:8px;color:#c5e8f5">Высокий процент выплаты</div>
-      <div id="hotPairs" class="pair-grid"></div>
-    </div>
-  </div>
-  <div id="page-signal" class="page">
+  <div id="page-signal" class="page active">
     <div id="signalMain">
       <div class="ai3d-panel">
         <div class="tf-selector" id="tfSelector">
@@ -280,7 +269,6 @@
     </div>
   </div>
   <div class="bottom-nav">
-    <button data-page="today">Главная</button>
     <button data-page="signal" class="active">Сигнал</button>
     <button data-page="profile">Профиль</button>
   </div>
@@ -293,7 +281,7 @@
   <div id="signalOverlay" class="signal-overlay hidden">
     <div id="signalCard"></div>
   </div>
-  <script src="/signal-engine.js?v=16"></script>
-  <script src="/ai-bot.js?v=16"></script>
+  <script src="/signal-engine.js?v=17"></script>
+  <script src="/ai-bot.js?v=17"></script>
 </body>
 </html>
