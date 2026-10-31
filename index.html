@@ -5,80 +5,98 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>AI Bot — Chat GPT Trade Bot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/ai-bot-3d.css?v=11">
+  <link rel="stylesheet" href="/ai-bot-3d.css?v=12">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    body { margin: 0; padding-bottom: 70px; }
+    body {
+      margin: 0; padding-bottom: 70px;
+      background:
+        radial-gradient(ellipse 120% 80% at 50% -10%, rgba(54,216,242,0.25), transparent),
+        radial-gradient(ellipse 80% 60% at 100% 100%, rgba(25,229,139,0.15), transparent),
+        linear-gradient(160deg, #0e1a2e 0%, #162840 40%, #0e1a2e 100%) !important;
+    }
     .header, .tabs-nav, .bottom-nav, .page { position: relative; z-index: 1; }
     .header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 14px 16px;
-      background: rgba(8, 13, 21, 0.8);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--ai3d-line);
+      background: rgba(14, 26, 46, 0.75);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(54,216,242,0.35);
       position: sticky; top: 0; z-index: 100;
     }
-    .header .title { font-weight: 800; font-size: 15px; }
+    .header .title { font-weight: 800; font-size: 15px; color: #fff; text-shadow: 0 0 12px #36d8f2; }
     .live {
       background: linear-gradient(90deg, #ff526d, #ff8a9b);
       color: #fff; font-size: 10px; font-weight: 800;
       padding: 3px 8px; border-radius: 6px; margin-right: 8px;
+      box-shadow: 0 0 10px #ff526d;
     }
     .tabs-nav {
-      display: flex; background: rgba(8,13,21,0.6); border-bottom: 1px solid var(--ai3d-line);
+      display: flex; background: rgba(14,26,46,0.65); border-bottom: 1px solid rgba(54,216,242,0.3);
     }
     .tabs-nav button {
       flex: 1; padding: 14px; background: none; border: none;
-      color: var(--ai3d-muted); font-size: 13px; font-weight: 700; cursor: pointer;
+      color: #a8c5d9; font-size: 13px; font-weight: 700; cursor: pointer;
     }
-    .tabs-nav button.active { color: #fff; border-bottom: 2px solid var(--ai3d-cyan); }
+    .tabs-nav button.active { color: #fff; border-bottom: 2px solid #36d8f2; text-shadow: 0 0 8px #36d8f2; }
     .page { display: none; padding: 14px; }
     .page.active { display: block; }
+    .ai3d-panel {
+      background: rgba(22, 40, 64, 0.7) !important;
+      border: 1px solid rgba(54,216,242,0.4) !important;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.35), 0 0 20px rgba(54,216,242,0.12) !important;
+      backdrop-filter: blur(16px);
+    }
     .cat-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 10px; }
     .cat-tabs button {
       flex-shrink: 0; padding: 8px 14px; border-radius: 999px;
-      background: rgba(160,190,220,0.08); border: 1px solid var(--ai3d-line);
-      color: var(--ai3d-muted); font-size: 12px; font-weight: 700; cursor: pointer;
+      background: rgba(54,216,242,0.12); border: 1px solid rgba(54,216,242,0.4);
+      color: #c5e8f5; font-size: 12px; font-weight: 700; cursor: pointer;
     }
     .cat-tabs button.active {
-      background: linear-gradient(145deg, #42f5a6, #0ecb79);
-      color: #071b13; border-color: transparent;
+      background: linear-gradient(145deg, #36d8f2, #19e58b);
+      color: #041018; border-color: transparent;
+      box-shadow: 0 0 14px rgba(54,216,242,0.5);
     }
     .pair-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 280px; overflow-y: auto; }
     .pair-card {
-      background: linear-gradient(145deg, rgba(34,48,67,.88), rgba(13,20,32,.94));
-      border: 1px solid var(--ai3d-line);
+      background: rgba(30, 55, 85, 0.85);
+      border: 1.5px solid rgba(54,216,242,0.55);
       border-radius: 14px;
       padding: 12px;
       text-align: center;
       cursor: pointer;
       transition: all 0.2s;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
     }
     .pair-card.selected {
-      border-color: rgba(42,255,164,.72);
-      background: linear-gradient(145deg, #42f5a6, #0ecb79);
-      color: #071b13;
+      border-color: #19e58b;
+      background: linear-gradient(145deg, #19e58b, #0bc879);
+      color: #041018;
+      box-shadow: 0 0 18px rgba(25,229,139,0.45);
     }
-    .pair-card .name { font-size: 13px; font-weight: 700; }
-    .pair-card .payout { color: var(--ai3d-green); font-size: 12px; font-weight: 800; margin-top: 4px; }
-    .pair-card.selected .payout { color: #052116; }
+    .pair-card .name { font-size: 13px; font-weight: 700; color: #fff; }
+    .pair-card.selected .name { color: #041018; }
+    .pair-card .payout { color: #19e58b; font-size: 12px; font-weight: 800; margin-top: 4px; text-shadow: 0 0 6px #19e58b; }
+    .pair-card.selected .payout { color: #041018; text-shadow: none; }
     .tf-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
     .tf-btn {
-      background: rgba(160,190,220,0.08);
-      border: 1px solid var(--ai3d-line);
-      color: var(--ai3d-text); padding: 10px 4px; border-radius: 12px;
+      background: rgba(54,216,242,0.1);
+      border: 1.5px solid rgba(54,216,242,0.45);
+      color: #e8f6ff; padding: 10px 4px; border-radius: 12px;
       font-size: 12px; font-weight: 700; cursor: pointer;
     }
     .tf-btn.selected {
-      background: linear-gradient(145deg, #42f5a6, #0ecb79);
-      color: #071b13; border-color: transparent;
+      background: linear-gradient(145deg, #36d8f2, #19e58b);
+      color: #041018; border-color: transparent;
+      box-shadow: 0 0 12px rgba(54,216,242,0.4);
     }
     .get-signal {
       width: 100%;
-      background: linear-gradient(135deg, #45f5a8, #0bc879);
-      color: #052116; border: none; padding: 16px; border-radius: 14px;
+      background: linear-gradient(135deg, #19e58b, #0bc879);
+      color: #041018; border: none; padding: 16px; border-radius: 14px;
       font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 8px;
-      box-shadow: 0 8px 22px rgba(15,205,125,.25);
+      box-shadow: 0 6px 20px rgba(25,229,139,0.4);
     }
     .get-signal:disabled { opacity: 0.5; }
     .analysis-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
@@ -88,38 +106,41 @@
       animation: spin 1s linear infinite;
       mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
       -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+      filter: drop-shadow(0 0 8px #36d8f2);
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .analysis-title { font-weight: 800; font-size: 17px; }
-    .analysis-sub { font-size: 12px; color: var(--ai3d-muted); }
+    .analysis-title { font-weight: 800; font-size: 17px; color: #fff; }
+    .analysis-sub { font-size: 12px; color: #a8c5d9; }
     .readings-header {
-      display: flex; justify-content: space-between; font-size: 11px; color: var(--ai3d-muted); margin: 6px 0 10px;
+      display: flex; justify-content: space-between; font-size: 11px; color: #a8c5d9; margin: 6px 0 10px;
     }
     .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .indicator {
-      background: linear-gradient(145deg, rgba(34,48,67,.9), rgba(13,20,32,.95));
-      border: 1px solid var(--ai3d-line);
+      background: rgba(30, 55, 85, 0.85);
+      border: 1.5px solid rgba(54,216,242,0.45);
       border-radius: 16px;
       padding: 10px;
       min-height: 96px;
       opacity: 0; transform: translateY(8px);
       transition: all 0.35s ease;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
     }
     .indicator.show { opacity: 1; transform: translateY(0); }
-    .indicator .label { font-size: 10px; color: var(--ai3d-muted); }
-    .indicator .value { font-weight: 800; font-size: 14px; margin: 4px 0; }
+    .indicator .label { font-size: 10px; color: #a8c5d9; }
+    .indicator .value { font-weight: 800; font-size: 14px; margin: 4px 0; color: #fff; }
     .chart-wrap { margin-top: 6px; height: 36px; }
     .progress {
-      height: 5px; background: rgba(255,255,255,0.08); border-radius: 3px; margin: 12px 0 6px; overflow: hidden;
+      height: 5px; background: rgba(54,216,242,0.15); border-radius: 3px; margin: 12px 0 6px; overflow: hidden;
     }
     .progress > div {
-      height: 100%; background: linear-gradient(90deg, #17c97d, #52f5b0);
+      height: 100%; background: linear-gradient(90deg, #19e58b, #36d8f2);
       width: 0%; transition: width 0.35s;
+      box-shadow: 0 0 8px #19e58b;
     }
-    .bottom-status { text-align: center; font-size: 12px; color: var(--ai3d-muted); }
+    .bottom-status { text-align: center; font-size: 12px; color: #a8c5d9; }
     .signal-overlay {
       position: fixed; inset: 0; z-index: 200;
-      background: rgba(7, 11, 18, 0.85);
+      background: rgba(8, 16, 28, 0.82);
       display: flex; align-items: center; justify-content: center;
       padding: 20px;
     }
@@ -131,46 +152,46 @@
     }
     @keyframes pop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     .big-signal.down {
-      background: linear-gradient(180deg, rgba(40,12,18,0.98), rgba(15,6,10,0.98));
-      border: 1px solid rgba(255,82,109,0.45);
-      box-shadow: 0 0 40px rgba(255,82,109,0.2);
+      background: linear-gradient(180deg, rgba(50,16,24,0.98), rgba(20,8,12,0.98));
+      border: 1.5px solid rgba(255,82,109,0.6);
+      box-shadow: 0 0 40px rgba(255,82,109,0.3);
     }
     .big-signal.up {
-      background: linear-gradient(180deg, rgba(10,40,28,0.98), rgba(5,20,14,0.98));
-      border: 1px solid rgba(25,229,139,0.45);
-      box-shadow: 0 0 40px rgba(25,229,139,0.2);
+      background: linear-gradient(180deg, rgba(12,48,36,0.98), rgba(6,24,16,0.98));
+      border: 1.5px solid rgba(25,229,139,0.6);
+      box-shadow: 0 0 40px rgba(25,229,139,0.3);
     }
     .big-signal .direction { font-size: 48px; font-weight: 900; }
-    .big-signal.down .direction { color: var(--ai3d-red); text-shadow: 0 0 20px var(--ai3d-red); }
-    .big-signal.up .direction { color: var(--ai3d-green); text-shadow: 0 0 20px var(--ai3d-green); }
+    .big-signal.down .direction { color: #ff526d; text-shadow: 0 0 20px #ff526d; }
+    .big-signal.up .direction { color: #19e58b; text-shadow: 0 0 20px #19e58b; }
     .signal-icon {
       width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 10px;
       display: flex; align-items: center; justify-content: center; font-size: 28px;
     }
-    .signal-icon.down { border: 2px solid var(--ai3d-red); background: rgba(255,82,109,0.15); }
-    .signal-icon.up { border: 2px solid var(--ai3d-green); background: rgba(25,229,139,0.15); }
-    .countdown { font-size: 13px; color: var(--ai3d-muted); margin-top: 8px; }
+    .signal-icon.down { border: 2px solid #ff526d; background: rgba(255,82,109,0.2); box-shadow: 0 0 16px #ff526d; }
+    .signal-icon.up { border: 2px solid #19e58b; background: rgba(25,229,139,0.2); box-shadow: 0 0 16px #19e58b; }
+    .countdown { font-size: 13px; color: #a8c5d9; margin-top: 8px; }
     .bottom-nav {
       position: fixed; bottom: 0; left: 0; right: 0;
-      background: rgba(8,13,21,0.92); backdrop-filter: blur(12px);
-      border-top: 1px solid var(--ai3d-line);
+      background: rgba(14,26,46,0.92); backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(54,216,242,0.35);
       display: flex; padding: 8px 0 env(safe-area-inset-bottom); z-index: 100;
     }
     .bottom-nav button {
-      flex: 1; background: none; border: none; color: var(--ai3d-muted);
+      flex: 1; background: none; border: none; color: #a8c5d9;
       font-size: 11px; font-weight: 700; padding: 8px; cursor: pointer;
     }
-    .bottom-nav button.active { color: #fff; }
-    .pair-count { font-size: 11px; color: var(--ai3d-muted); margin-bottom: 8px; }
+    .bottom-nav button.active { color: #fff; text-shadow: 0 0 6px #36d8f2; }
+    .pair-count { font-size: 11px; color: #a8c5d9; margin-bottom: 8px; }
     .search-box {
       width: 100%; padding: 12px 14px; border-radius: 14px;
-      border: 1px solid var(--ai3d-line); background: rgba(5,11,19,0.62);
+      border: 1.5px solid rgba(54,216,242,0.45); background: rgba(20,40,65,0.75);
       color: #fff; font-size: 13px; margin-bottom: 10px; outline: none;
     }
     .rescan-btn {
       width: 100%; margin-top: 12px;
-      background: linear-gradient(135deg, #45f5a8, #0bc879);
-      color: #052116; border: none; padding: 14px; border-radius: 14px;
+      background: linear-gradient(135deg, #19e58b, #0bc879);
+      color: #041018; border: none; padding: 14px; border-radius: 14px;
       font-size: 14px; font-weight: 800; cursor: pointer;
     }
   </style>
@@ -178,7 +199,7 @@
 <body class="ai3d">
   <div class="header">
     <div><span class="live">LIVE</span><span class="title">Chat GPT Trade Bot</span></div>
-    <div id="userBadge" style="font-size:11px;color:var(--ai3d-muted)"></div>
+    <div id="userBadge" style="font-size:11px;color:#a8c5d9"></div>
   </div>
   <div class="tabs-nav">
     <button data-page="today" class="active">Сегодня</button>
@@ -187,23 +208,23 @@
   </div>
   <div id="page-today" class="page active">
     <div class="ai3d-panel">
-      <h3 style="margin-bottom:10px;font-size:15px">Статистика за сегодня</h3>
-      <div id="todayStats">Загрузка...</div>
+      <h3 style="margin-bottom:10px;font-size:15px;color:#fff">Статистика за сегодня</h3>
+      <div id="todayStats" style="color:#e8f6ff">Загрузка...</div>
     </div>
     <div class="ai3d-panel">
-      <div style="font-size:13px;margin-bottom:8px">Высокий процент выплаты</div>
+      <div style="font-size:13px;margin-bottom:8px;color:#c5e8f5">Высокий процент выплаты</div>
       <div id="hotPairs" class="pair-grid"></div>
     </div>
   </div>
   <div id="page-signal" class="page">
     <div id="signalMain">
       <div class="ai3d-panel">
-        <div style="font-size:12px;color:var(--ai3d-muted);margin-bottom:8px">Категория</div>
+        <div style="font-size:12px;color:#a8c5d9;margin-bottom:8px">Категория</div>
         <div class="cat-tabs" id="catTabs"></div>
         <input type="text" class="search-box" id="pairSearch" placeholder="Поиск пары...">
         <div class="pair-count" id="pairCount"></div>
         <div id="pairGrid" class="pair-grid"></div>
-        <div style="font-size:12px;color:var(--ai3d-muted);margin:12px 0 6px">Время сделки</div>
+        <div style="font-size:12px;color:#a8c5d9;margin:12px 0 6px">Время сделки</div>
         <div class="tf-grid" id="tfGrid"></div>
         <button class="get-signal" id="getSignalBtn">⚙️ Получить сигнал</button>
       </div>
@@ -229,10 +250,10 @@
   </div>
   <div id="page-profile" class="page">
     <div class="ai3d-panel">
-      <h3>Профиль</h3>
-      <p style="color:var(--ai3d-muted);font-size:13px;margin:8px 0">Доступ к сигналам только по User ID</p>
-      <div id="tgAuto" style="margin:10px 0;font-size:13px"></div>
-      <label style="font-size:12px;color:var(--ai3d-muted)">User ID (Telegram)</label>
+      <h3 style="color:#fff">Профиль</h3>
+      <p style="color:#a8c5d9;font-size:13px;margin:8px 0">Доступ к сигналам только по User ID</p>
+      <div id="tgAuto" style="margin:10px 0;font-size:13px;color:#e8f6ff"></div>
+      <label style="font-size:12px;color:#a8c5d9">User ID (Telegram)</label>
       <input type="text" class="search-box" id="userIdInput" placeholder="Введите Telegram ID">
       <button class="get-signal" id="saveIdBtn">Сохранить</button>
       <div id="profileStatus" style="margin-top:10px;font-size:13px"></div>
@@ -246,7 +267,7 @@
   <div id="signalOverlay" class="signal-overlay hidden">
     <div id="signalCard"></div>
   </div>
-  <script src="/signal-engine.js?v=11"></script>
-  <script src="/ai-bot.js?v=11"></script>
+  <script src="/signal-engine.js?v=12"></script>
+  <script src="/ai-bot.js?v=12"></script>
 </body>
 </html>
