@@ -3,11 +3,16 @@
   var TIMEFRAMES = [
     { label: '5 сек', value: 5 },
     { label: '15 сек', value: 15 },
+    { label: '30 сек', value: 30 },
     { label: '1 мин', value: 60 },
+    { label: '2 мин', value: 120 },
     { label: '3 мин', value: 180 },
     { label: '5 мин', value: 300 },
+    { label: '10 мин', value: 600 },
+    { label: '15 мин', value: 900 },
     { label: '30 мин', value: 1800 },
     { label: '1 час', value: 3600 },
+    { label: '4 часа', value: 14400 },
     { label: '1 день', value: 86400 }
   ];
 
@@ -179,58 +184,152 @@
     });
   }
 
-  function createAnimatedChart(container, type) {
+  function tfLabel() {
+    var tf = TIMEFRAMES.find(function (t) { return t.value === selectedTf; });
+    return tf ? tf.label : (selectedTf + ' сек');
+  }
+
+  function createViz(container, type) {
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'mini-chart');
-    svg.setAttribute('viewBox', '0 0 100 28');
-    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('viewBox', '0 0 100 32');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '32');
+    svg.style.display = 'block';
     container.appendChild(svg);
-    var points = [];
-    var y = 14;
-    for (var i = 0; i < 18; i++) {
-      y += (Math.random() - 0.5) * 4;
-      y = Math.max(4, Math.min(24, y));
-      points.push({ x: i * 5.5, y: y });
-    }
-    var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    poly.setAttribute('fill', 'none');
-    poly.setAttribute('stroke', '#6b7280');
-    poly.setAttribute('stroke-width', '1.6');
-    poly.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(poly);
-    var bars = [];
-    if (type === 'rsi') {
-      for (var b = 0; b < 7; b++) {
+    var running = true;
+
+    if (type === 'line' || type === 'support' || type === 'ma') {
+      var pts = [];
+      var y = 16;
+      for (var i = 0; i < 16; i++) {
+        y += (Math.random() - 0.5) * 5;
+        y = Math.max(4, Math.min(28, y));
+        pts.push({ x: i * 6.4, y: y });
+      }
+      var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      poly.setAttribute('fill', 'none');
+      poly.setAttribute('stroke', '#6b7280');
+      poly.setAttribute('stroke-width', type === 'ma' ? '1.2' : '1.8');
+      poly.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(poly);
+      var poly2 = null;
+      if (type === 'ma') {
+        poly2 = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        poly2.setAttribute('fill', 'none');
+        poly2.setAttribute('stroke', '#8b6cff');
+        poly2.setAttribute('stroke-width', '1.2');
+        poly2.setAttribute('stroke-dasharray', '2,2');
+        svg.appendChild(poly2);
+      }
+      function tickLine() {
+        if (!running) return;
+        pts.shift();
+        var last = pts[pts.length - 1];
+        var ny = last.y + (Math.random() - 0.5) * 6;
+        ny = Math.max(4, Math.min(28, ny));
+        pts.push({ x: last.x + 6.4, y: ny });
+        poly.setAttribute('points', pts.map(function (p) { return p.x + ',' + p.y; }).join(' '));
+        if (poly2) {
+          var pts2 = pts.map(function (p, i) { return (p.x) + ',' + Math.max(4, Math.min(28, p.y + Math.sin(i * 0.5) * 3)); });
+          poly2.setAttribute('points', pts2.join(' '));
+        }
+        requestAnimationFrame(tickLine);
+      }
+      tickLine();
+    } else if (type === 'impulse' || type === 'vol') {
+      var bars = [];
+      for (var b = 0; b < 8; b++) {
         var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('x', 6 + b * 13);
-        rect.setAttribute('y', 16);
+        rect.setAttribute('x', 4 + b * 12);
         rect.setAttribute('width', 8);
-        rect.setAttribute('height', 8);
-        rect.setAttribute('rx', '1');
+        rect.setAttribute('rx', '1.5');
         rect.setAttribute('fill', '#8b6cff');
+        rect.setAttribute('opacity', '0.85');
         svg.appendChild(rect);
         bars.push(rect);
       }
-    }
-    var running = true;
-    function tick() {
-      if (!running) return;
-      points.shift();
-      var last = points[points.length - 1];
-      var ny = last.y + (Math.random() - 0.5) * 5;
-      ny = Math.max(4, Math.min(24, ny));
-      points.push({ x: last.x + 5.5, y: ny });
-      poly.setAttribute('points', points.map(function (p) { return p.x + ',' + p.y; }).join(' '));
-      if (bars.length) {
+      function tickBars() {
+        if (!running) return;
         bars.forEach(function (rect) {
-          var h = 4 + Math.random() * 16;
+          var h = 4 + Math.random() * 22;
           rect.setAttribute('height', h);
-          rect.setAttribute('y', 28 - h);
+          rect.setAttribute('y', 32 - h);
         });
+        requestAnimationFrame(tickBars);
       }
-      requestAnimationFrame(tick);
+      tickBars();
+    } else if (type === 'move') {
+      var arrows = [];
+      for (var a = 0; a < 5; a++) {
+        var g = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        g.setAttribute('x', 10 + a * 18);
+        g.setAttribute('y', 20);
+        g.setAttribute('font-size', '12');
+        g.setAttribute('fill', '#6b7280');
+        g.textContent = Math.random() > 0.5 ? '↑' : '↓';
+        svg.appendChild(g);
+        arrows.push(g);
+      }
+      function tickMove() {
+        if (!running) return;
+        arrows.forEach(function (el) {
+          el.textContent = Math.random() > 0.5 ? '↑' : '↓';
+          el.setAttribute('fill', el.textContent === '↑' ? '#1ee687' : '#ff4d6d');
+        });
+        setTimeout(tickMove, 280);
+      }
+      tickMove();
+    } else if (type === 'session') {
+      var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', '50');
+      circle.setAttribute('cy', '16');
+      circle.setAttribute('r', '10');
+      circle.setAttribute('fill', 'none');
+      circle.setAttribute('stroke', '#6b7280');
+      circle.setAttribute('stroke-width', '2');
+      svg.appendChild(circle);
+      var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('r', '3');
+      dot.setAttribute('fill', '#8b6cff');
+      svg.appendChild(dot);
+      var angle = 0;
+      function tickSess() {
+        if (!running) return;
+        angle += 0.08;
+        var cx = 50 + Math.cos(angle) * 10;
+        var cy = 16 + Math.sin(angle) * 10;
+        dot.setAttribute('cx', cx);
+        dot.setAttribute('cy', cy);
+        requestAnimationFrame(tickSess);
+      }
+      tickSess();
+    } else if (type === 'rsi') {
+      var bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      bg.setAttribute('x', '10');
+      bg.setAttribute('y', '12');
+      bg.setAttribute('width', '80');
+      bg.setAttribute('height', '8');
+      bg.setAttribute('rx', '4');
+      bg.setAttribute('fill', 'rgba(255,255,255,0.08)');
+      svg.appendChild(bg);
+      var fill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      fill.setAttribute('x', '10');
+      fill.setAttribute('y', '12');
+      fill.setAttribute('height', '8');
+      fill.setAttribute('rx', '4');
+      fill.setAttribute('fill', '#8b6cff');
+      svg.appendChild(fill);
+      var rsiVal = 50;
+      function tickRsi() {
+        if (!running) return;
+        rsiVal += (Math.random() - 0.5) * 8;
+        rsiVal = Math.max(20, Math.min(80, rsiVal));
+        fill.setAttribute('width', (rsiVal / 100) * 80);
+        requestAnimationFrame(tickRsi);
+      }
+      tickRsi();
     }
-    tick();
+
     return function () { running = false; };
   }
 
@@ -244,15 +343,16 @@
     $('analysisView').style.display = 'block';
     $('signalResult').style.display = 'none';
 
+    var tfName = tfLabel();
     var indicators = [
-      { key: 'trend', label: 'Тренд — ' + selectedTf + ' сек', type: 'line' },
-      { key: 'support', label: 'Поддержка', type: 'line' },
-      { key: 'move', label: 'Ход за ' + selectedTf + ' сек', type: 'line' },
-      { key: 'impulse', label: 'Импульс', type: 'line' },
-      { key: 'session', label: 'Сессия', type: 'bars' },
-      { key: 'ma', label: 'Средние 50/200', type: 'line' },
+      { key: 'trend', label: 'Тренд — ' + tfName, type: 'line' },
+      { key: 'support', label: 'Поддержка', type: 'support' },
+      { key: 'move', label: 'Ход за ' + tfName, type: 'move' },
+      { key: 'impulse', label: 'Импульс', type: 'impulse' },
+      { key: 'session', label: 'Сессия', type: 'session' },
+      { key: 'ma', label: 'Средние 50/200', type: 'ma' },
       { key: 'rsi', label: 'RSI', type: 'rsi' },
-      { key: 'vol', label: 'Волатильность', type: 'line' }
+      { key: 'vol', label: 'Волатильность', type: 'vol' }
     ];
 
     var indBox = $('indicators');
@@ -263,9 +363,10 @@
       div.id = 'ind-' + ind.key;
       div.innerHTML = '<div class="label">' + ind.label + '</div><div class="value">—</div>';
       var wrap = document.createElement('div');
+      wrap.style.marginTop = '4px';
       div.appendChild(wrap);
       indBox.appendChild(div);
-      chartAnimators.push(createAnimatedChart(wrap, ind.type));
+      chartAnimators.push(createViz(wrap, ind.type));
     });
 
     var bar = $('analysisBar');
@@ -273,6 +374,7 @@
     var countEl = $('progressCount');
     var bottom = $('bottomStatus');
 
+    var stepMs = 420;
     for (var i = 0; i < indicators.length; i++) {
       var num = i + 1;
       status.textContent = 'Взвешиваю всё...';
@@ -281,7 +383,7 @@
       bar.style.width = (num / indicators.length * 100) + '%';
       var el = $('ind-' + indicators[i].key);
       if (el) el.classList.add('show');
-      await sleep(420);
+      await sleep(stepMs);
     }
 
     try {
@@ -310,15 +412,17 @@
         var val = isDown ? 'Вниз' : 'Вверх';
         if (ind.key === 'rsi') val = isDown ? '38' : '62';
         if (ind.key === 'support') val = isDown ? 'слабая' : 'сильная';
+        if (ind.key === 'session') val = isDown ? 'азиатская' : 'европейская';
         el.querySelector('.value').textContent = val;
         el.querySelector('.value').style.color = chartColor;
-        var poly = el.querySelector('polyline');
-        if (poly) poly.setAttribute('stroke', chartColor);
-        el.querySelectorAll('rect').forEach(function (r) { r.setAttribute('fill', chartColor); });
+        el.querySelectorAll('polyline').forEach(function (p) { p.setAttribute('stroke', chartColor); });
+        el.querySelectorAll('rect').forEach(function (r) {
+          if (r.getAttribute('fill') !== 'rgba(255,255,255,0.08)') r.setAttribute('fill', chartColor);
+        });
       });
       status.textContent = 'Анализ завершён';
       if (bottom) bottom.textContent = 'GPT 6.0 завершил анализ';
-      await sleep(800);
+      await sleep(600);
       showResult(isDown, reason);
     } catch (e) {
       status.textContent = 'Ошибка получения данных';
@@ -337,7 +441,7 @@
     var dir = isDown ? 'ВНИЗ' : 'ВВЕРХ';
     var cls = isDown ? 'down' : 'up';
     var icon = isDown ? '↓' : '↑';
-    var tfLabel = TIMEFRAMES.find(function (t) { return t.value === selectedTf; }) || { label: selectedTf + 'с' };
+    var tfName = tfLabel();
     var pairName = allPairs.find(function (p) { return p.symbol === selectedPair; });
     var pairLabel = pairName ? pairName.display : selectedPair;
     box.innerHTML =
@@ -345,7 +449,7 @@
         '<div class="signal-icon ' + cls + '">' + icon + '</div>' +
         '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">' + pairLabel + '</div>' +
         '<div class="direction">' + dir + '</div>' +
-        '<div style="margin-top:8px;font-size:13px">Откройте «' + dir + '» на ' + tfLabel.label + '</div>' +
+        '<div style="margin-top:8px;font-size:13px">Откройте «' + dir + '» на ' + tfName + '</div>' +
         '<div class="countdown" id="cd">Войдите за 0:' + String(Math.min(selectedTf, 59)).padStart(2, '0') + '</div>' +
         '<div style="margin-top:10px;font-size:11px;color:var(--muted)">' + (reason || '') + '</div>' +
       '</div>' +
