@@ -62,6 +62,39 @@
       margin-bottom: 12px;
       border: 1px solid var(--border);
     }
+    .search-box {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--card2);
+      color: #fff;
+      font-size: 14px;
+      margin-bottom: 12px;
+      outline: none;
+    }
+    .search-box:focus { border-color: var(--purple); }
+    .pair-list {
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .pair-item {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .pair-item.selected { border-color: var(--green); background: #0f2a1e; }
+    .pair-item .payout { color: var(--green); font-weight: 700; }
     .pair-row {
       display: flex;
       gap: 10px;
@@ -195,6 +228,7 @@
       width: 0%;
       transition: width 0.3s;
     }
+    .pair-count { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   </style>
 </head>
 <body>
@@ -224,7 +258,9 @@
     <div id="signalMain">
       <div class="pair-card">
         <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Выберите пару</div>
-        <div id="pairList" class="pair-row"></div>
+        <input type="text" class="search-box" id="pairSearch" placeholder="Поиск пары (EUR, AUD, BTC...)">
+        <div class="pair-count" id="pairCount"></div>
+        <div id="pairList" class="pair-list"></div>
         <div style="font-size:13px;color:var(--muted);margin:12px 0 8px">Время сделки</div>
         <div class="tf-grid" id="tfGrid"></div>
         <button class="get-signal" id="getSignalBtn">⚙️ Получить сигнал</button>
