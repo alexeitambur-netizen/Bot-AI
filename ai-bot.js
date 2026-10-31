@@ -214,27 +214,73 @@
   }
 
   function analyzeTicks(candles) {
-    if (!candles || candles.length < 3) {
-      return { isDown: Math.random() > 0.5, reason: 'Анализ по тикам', entry: null };
+    if (!candles || candles.length < 5) {
+      return { isDown: Math.random() > 0.5, reason: 'Мало данных', entry: null };
     }
-    var recent = candles.slice(-8);
-    var closes = recent.map(function (c) { return Number(c.close) || 0; });
+    var recent = candles.slice(-12);
+    var bodies = [];
+    var closes = [];
+    var highs = [];
+    var lows = [];
+    for (var i = 0; i < recent.length; i++) {
+      var c = recent[i];
+      var o = Number(c.open) || 0;
+      var cl = Number(c.close) || 0;
+      var h = Number(c.high) || cl;
+      var l = Number(c.low) || cl;
+      bodies.push(cl - o);
+      closes.push(cl);
+      highs.push(h);
+      lows.push(l);
+    }
     var last = closes[closes.length - 1];
     var prev = closes[closes.length - 2] || last;
-    var older = closes[Math.max(0, closes.length - 5)] || prev;
-    var downCount = 0;
-    var upCount = 0;
-    for (var i = 1; i < closes.length; i++) {
-      if (closes[i] < closes[i - 1]) downCount++;
-      else if (closes[i] > closes[i - 1]) upCount++;
+    var older = closes[Math.max(0, closes.length - 6)] || prev;
+
+    var upBodies = 0;
+    var downBodies = 0;
+    var upSize = 0;
+    var downSize = 0;
+    for (var j = 0; j < bodies.length; j++) {
+      if (bodies[j] > 0) { upBodies++; upSize += bodies[j]; }
+      else if (bodies[j] < 0) { downBodies++; downSize += Math.abs(bodies[j]); }
     }
+
+    var lastBody = bodies[bodies.length - 1] || 0;
+    var prevBody = bodies[bodies.length - 2] || 0;
+    var accel = Math.abs(lastBody) - Math.abs(prevBody);
+
+    var recentUp = 0;
+    var recentDown = 0;
+    for (var k = Math.max(0, closes.length - 4); k < closes.length; k++) {
+      if (k > 0) {
+        if (closes[k] > closes[k - 1]) recentUp++;
+        else if (closes[k] < closes[k - 1]) recentDown++;
+      }
+    }
+
     var score = 0;
-    if (last < prev) score -= 3; else score += 3;
-    if (last < older) score -= 2; else score += 2;
-    if (downCount > upCount + 1) score -= 2;
-    if (upCount > downCount + 1) score += 2;
+    if (upBodies > downBodies + 1) score += 2;
+    if (downBodies > upBodies + 1) score -= 2;
+    if (upSize > downSize * 1.3) score += 2;
+    if (downSize > upSize * 1.3) score -= 2;
+    if (last > older) score += 1;
+    if (last < older) score -= 1;
+    if (recentUp >= 3) score += 1;
+    if (recentDown >= 3) score -= 1;
+
+    if (lastBody > 0 && accel > 0) score += 1;
+    if (lastBody < 0 && accel > 0) score -= 1;
+    if (lastBody > 0 && accel < 0 && Math.abs(lastBody) < Math.abs(prevBody) * 0.5) score -= 1;
+    if (lastBody < 0 && accel < 0 && Math.abs(lastBody) < Math.abs(prevBody) * 0.5) score += 1;
+
     var isDown = score < 0;
-    var reason = (isDown ? 'Импульс вниз' : 'Импульс вверх') + ' · ' + downCount + '↓/' + upCount + '↑';
+    if (score === 0) isDown = lastBody < 0;
+
+    var reason = (isDown ? 'Импульс вниз' : 'Импульс вверх') +
+      ' · ' + upBodies + '↑/' + downBodies + '↓' +
+      (accel > 0 ? ' · ускорение' : '');
+
     return { isDown: isDown, reason: reason, entry: last };
   }
 
