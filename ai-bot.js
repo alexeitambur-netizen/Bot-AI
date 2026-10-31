@@ -1,5 +1,7 @@
 /* AI Bot — логика мини-приложения */
 (function () {
+  var ADMIN_ID = '5817328317';
+
   var TIMEFRAMES = [
     { label: '5 сек', value: 5 },
     { label: '15 сек', value: 15 },
@@ -27,7 +29,7 @@
   var selectedPair = localStorage.getItem('aiBotSelectedPair') || 'EURUSD_otc';
   var selectedTf = Number(localStorage.getItem('aiBotSelectedTf')) || 5;
   var selectedCat = localStorage.getItem('aiBotSelectedCat') || 'currencies';
-  var userId = localStorage.getItem('aiBotUserId') || '';
+  var userId = '';
   var allPairs = [];
   var searchQuery = '';
   var chartAnimators = [];
@@ -57,19 +59,25 @@
       var user = Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user;
       if (user && user.id) {
         userId = String(user.id);
-        localStorage.setItem('aiBotUserId', userId);
-        var el = $('tgAuto');
-        if (el) el.innerHTML = 'Телеграм ID: <b>' + userId + '</b>';
       }
     }
     updateUserBadge();
     var input = $('userIdInput');
     if (input) input.value = userId;
+    var el = $('tgAuto');
+    if (el) el.innerHTML = userId ? 'Телеграм ID: <b>' + userId + '</b>' : 'Не удалось определить ID';
   }
 
   function updateUserBadge() {
     var badge = $('userBadge');
-    if (badge) badge.textContent = userId ? 'ID: ' + userId.slice(-4) : 'Нет доступа';
+    if (!badge) return;
+    if (userId === ADMIN_ID) {
+      badge.textContent = 'Admin';
+      badge.style.color = '#19e58b';
+    } else {
+      badge.textContent = 'Нет доступа';
+      badge.style.color = '#ff526d';
+    }
   }
 
   function updateTfDisplay() {
@@ -78,8 +86,8 @@
   }
 
   function checkAccess() {
-    if (!userId) {
-      alert('Доступ только по User ID. Введите его в Профиле.');
+    if (userId !== ADMIN_ID) {
+      alert('Доступ закрыт. Только для администратора.');
       showPage('profile');
       return false;
     }
@@ -575,15 +583,7 @@
   var saveBtn = $('saveIdBtn');
   if (saveBtn) {
     saveBtn.addEventListener('click', function () {
-      var val = $('userIdInput').value.trim();
-      if (!val) {
-        $('profileStatus').innerHTML = '<span style="color:#ff526d">Введите ID</span>';
-        return;
-      }
-      userId = val;
-      localStorage.setItem('aiBotUserId', userId);
-      $('profileStatus').innerHTML = '<span style="color:#19e58b">Сохранено. Доступ открыт.</span>';
-      updateUserBadge();
+      $('profileStatus').innerHTML = '<span style="color:#ff526d">Доступ только для администратора</span>';
     });
   }
 
@@ -593,7 +593,13 @@
     loadPayouts();
     var stats = $('todayStats');
     if (stats) stats.innerHTML = 'Сделки: 0<br>Успешные: —<br>Оборот: —';
-    showPage('signal');
+    if (userId === ADMIN_ID) {
+      showPage('signal');
+    } else {
+      showPage('profile');
+      var status = $('profileStatus');
+      if (status) status.innerHTML = '<span style="color:#ff526d">Доступ закрыт</span>';
+    }
   }
 
   if (document.readyState === 'loading') {
