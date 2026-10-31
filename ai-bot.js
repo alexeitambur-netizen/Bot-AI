@@ -240,107 +240,30 @@
 
   function createViz(container, type, color) {
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 100 48');
+    svg.setAttribute('viewBox', '0 0 100 56');
     svg.setAttribute('width', '100%');
-    svg.setAttribute('height', '48');
+    svg.setAttribute('height', '56');
     svg.style.display = 'block';
     container.appendChild(svg);
+    var c = color || '#36d8f2';
     var running = true;
-    var stroke = color || '#36d8f2';
 
-    if (type === 'line' || type === 'support' || type === 'move' || type === 'ma') {
-      var pts = [];
-      var y = 24;
-      for (var i = 0; i < 16; i++) {
-        y += (Math.random() - 0.48) * 6;
-        y = Math.max(6, Math.min(42, y));
-        pts.push({ x: i * 6.4, y: y });
-      }
-      var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-      poly.setAttribute('fill', 'none');
-      poly.setAttribute('stroke', stroke);
-      poly.setAttribute('stroke-width', '2');
-      poly.setAttribute('stroke-linecap', 'round');
-      svg.appendChild(poly);
-      function tickLine() {
-        if (!running) return;
-        pts.shift();
-        var last = pts[pts.length - 1];
-        var ny = last.y + (Math.random() - 0.5) * 6;
-        ny = Math.max(6, Math.min(42, ny));
-        pts.push({ x: last.x + 6.4, y: ny });
-        poly.setAttribute('points', pts.map(function (p) { return p.x + ',' + p.y; }).join(' '));
-        requestAnimationFrame(tickLine);
-      }
-      tickLine();
-    } else if (type === 'impulse' || type === 'vol') {
-      var bars = [];
-      for (var b = 0; b < 8; b++) {
-        var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('x', 4 + b * 12);
-        rect.setAttribute('width', 8);
-        rect.setAttribute('rx', '2');
-        rect.setAttribute('fill', stroke);
-        svg.appendChild(rect);
-        bars.push(rect);
-      }
-      function tickBars() {
-        if (!running) return;
-        bars.forEach(function (rect) {
-          var h = 6 + Math.random() * 32;
-          rect.setAttribute('height', h);
-          rect.setAttribute('y', 48 - h);
-        });
-        requestAnimationFrame(tickBars);
-      }
-      tickBars();
+    if (type === 'line') {
+      svg.innerHTML = '<g opacity="0.9"><path d="M10 40 L25 32 L40 28 L55 22 L70 18 L85 14" fill="none" stroke="' + c + '" stroke-width="2.5" stroke-linecap="round"/><path d="M10 40 L25 32 L40 28 L55 22 L70 18 L85 14 L85 48 L10 48 Z" fill="' + c + '" opacity="0.15"/><circle cx="85" cy="14" r="3" fill="' + c + '"/><path d="M75 8 L85 14 L80 18" fill="none" stroke="' + c + '" stroke-width="1.5"/></g>';
+    } else if (type === 'support') {
+      svg.innerHTML = '<g><ellipse cx="50" cy="38" rx="28" ry="8" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.6"/><ellipse cx="50" cy="38" rx="20" ry="5" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.8"/><path d="M30 30 Q50 20 70 30" fill="none" stroke="' + c + '" stroke-width="2"/><path d="M35 26 Q50 16 65 26" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.7"/><circle cx="50" cy="18" r="3" fill="' + c + '"/></g>';
+    } else if (type === 'move') {
+      svg.innerHTML = '<g><rect x="22" y="8" width="56" height="40" rx="4" fill="none" stroke="' + c + '" stroke-width="1.5"/><path d="M38 20 L38 36 M46 18 L46 38 M54 22 L54 34 M62 16 L62 40" fill="none" stroke="' + c + '" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="28" r="2" fill="' + c + '"/></g>';
+    } else if (type === 'impulse') {
+      svg.innerHTML = '<g><ellipse cx="50" cy="22" rx="12" ry="10" fill="' + c + '" opacity="0.3"/><path d="M40 20 Q45 12 50 14 Q55 12 60 20 Q58 28 50 30 Q42 28 40 20" fill="' + c + '" opacity="0.6"/><line x1="50" y1="8" x2="50" y2="36" stroke="' + c + '" stroke-width="1" opacity="0.5"/><line x1="30" y1="22" x2="70" y2="22" stroke="' + c + '" stroke-width="1" opacity="0.5"/><rect x="28" y="38" width="4" height="12" rx="1" fill="' + c + '"/><rect x="36" y="34" width="4" height="16" rx="1" fill="' + c + '"/><rect x="44" y="30" width="4" height="20" rx="1" fill="' + c + '"/><rect x="52" y="32" width="4" height="18" rx="1" fill="' + c + '"/><rect x="60" y="36" width="4" height="14" rx="1" fill="' + c + '"/></g>';
     } else if (type === 'session') {
-      var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('cx', '50');
-      circle.setAttribute('cy', '24');
-      circle.setAttribute('r', '14');
-      circle.setAttribute('fill', 'none');
-      circle.setAttribute('stroke', stroke);
-      circle.setAttribute('stroke-width', '2');
-      svg.appendChild(circle);
-      var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      dot.setAttribute('r', '4');
-      dot.setAttribute('fill', stroke);
-      svg.appendChild(dot);
-      var angle = 0;
-      function tickSess() {
-        if (!running) return;
-        angle += 0.05;
-        dot.setAttribute('cx', 50 + Math.cos(angle) * 14);
-        dot.setAttribute('cy', 24 + Math.sin(angle) * 14);
-        requestAnimationFrame(tickSess);
-      }
-      tickSess();
+      svg.innerHTML = '<g><path d="M15 42 L50 20 L85 42" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.4"/><path d="M25 42 L50 26 L75 42" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.6"/><circle cx="50" cy="36" r="8" fill="none" stroke="' + c + '" stroke-width="2"/><circle cx="50" cy="36" r="3" fill="' + c + '" opacity="0.5"/></g>';
+    } else if (type === 'ma') {
+      svg.innerHTML = '<g><rect x="35" y="42" width="30" height="6" rx="2" fill="' + c + '" opacity="0.4"/><polygon points="50,12 58,28 42,28" fill="' + c + '" opacity="0.7"/><polygon points="50,18 54,28 46,28" fill="' + c + '"/><rect x="46" y="28" width="8" height="14" fill="' + c + '" opacity="0.8"/></g>';
     } else if (type === 'rsi') {
-      var bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      bg.setAttribute('x', '8');
-      bg.setAttribute('y', '20');
-      bg.setAttribute('width', '84');
-      bg.setAttribute('height', '8');
-      bg.setAttribute('rx', '4');
-      bg.setAttribute('fill', 'rgba(255,255,255,0.08)');
-      svg.appendChild(bg);
-      var fill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      fill.setAttribute('x', '8');
-      fill.setAttribute('y', '20');
-      fill.setAttribute('height', '8');
-      fill.setAttribute('rx', '4');
-      fill.setAttribute('fill', stroke);
-      svg.appendChild(fill);
-      var rsiVal = 50;
-      function tickRsi() {
-        if (!running) return;
-        rsiVal += (Math.random() - 0.5) * 6;
-        rsiVal = Math.max(25, Math.min(75, rsiVal));
-        fill.setAttribute('width', (rsiVal / 100) * 84);
-        requestAnimationFrame(tickRsi);
-      }
-      tickRsi();
+      svg.innerHTML = '<g><path d="M12 40 L22 32 L32 36 L42 24 L52 28 L62 18" fill="none" stroke="' + c + '" stroke-width="2"/><rect x="68" y="22" width="20" height="14" rx="2" fill="none" stroke="' + c + '" stroke-width="1.5"/><polygon points="78,22 70,30 86,30" fill="' + c + '" opacity="0.4"/><rect x="20" y="44" width="40" height="4" rx="2" fill="' + c + '" opacity="0.6"/></g>';
+    } else if (type === 'vol') {
+      svg.innerHTML = '<g><rect x="20" y="48" width="60" height="4" rx="1" fill="' + c + '" opacity="0.3"/><rect x="24" y="36" width="6" height="12" fill="' + c + '"/><rect x="34" y="28" width="6" height="20" fill="' + c + '"/><rect x="44" y="22" width="6" height="26" fill="' + c + '"/><rect x="54" y="30" width="6" height="18" fill="' + c + '"/><rect x="64" y="34" width="6" height="14" fill="' + c + '"/><rect x="74" y="38" width="6" height="10" fill="' + c + '"/></g>';
     }
 
     return function () { running = false; };
