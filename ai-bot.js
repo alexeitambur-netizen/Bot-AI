@@ -16,6 +16,7 @@
   var userId = localStorage.getItem('aiBotUserId') || '';
   var pairs = [];
   var searchQuery = '';
+  var chartAnimators = [];
 
   function $(id) { return document.getElementById(id); }
 
@@ -153,21 +154,73 @@
     });
   }
 
-  function makeMiniChart(color) {
+  function createAnimatedChart(container, type) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'mini-chart');
+    svg.setAttribute('viewBox', '0 0 100 32');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    container.appendChild(svg);
+
     var points = [];
-    var y = 14;
-    for (var i = 0; i < 12; i++) {
-      y += (Math.random() - 0.48) * 6;
-      y = Math.max(4, Math.min(24, y));
-      points.push((i * 9) + ',' + y.toFixed(1));
+    var y = 16;
+    for (var i = 0; i < 20; i++) {
+      y += (Math.random() - 0.5) * 5;
+      y = Math.max(4, Math.min(28, y));
+      points.push({ x: i * 5.2, y: y });
     }
-    return '<svg class="mini-chart" viewBox="0 0 100 28" preserveAspectRatio="none">' +
-      '<polyline fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" points="' + points.join(' ') + '"/>' +
-      '</svg>';
+
+    var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    poly.setAttribute('fill', 'none');
+    poly.setAttribute('stroke', '#6b7280');
+    poly.setAttribute('stroke-width', '1.8');
+    poly.setAttribute('stroke-linecap', 'round');
+    poly.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(poly);
+
+    var bars = [];
+    if (type === 'rsi') {
+      for (var b = 0; b < 8; b++) {
+        var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', 4 + b * 12);
+        rect.setAttribute('y', 20);
+        rect.setAttribute('width', 8);
+        rect.setAttribute('height', 8);
+        rect.setAttribute('rx', '1');
+        rect.setAttribute('fill', '#8b6cff');
+        rect.setAttribute('opacity', '0.7');
+        svg.appendChild(rect);
+        bars.push(rect);
+      }
+    }
+
+    var running = true;
+    function tick() {
+      if (!running) return;
+      points.shift();
+      var last = points[points.length - 1];
+      var ny = last.y + (Math.random() - 0.5) * 6;
+      ny = Math.max(4, Math.min(28, ny));
+      points.push({ x: last.x + 5.2, y: ny });
+      var d = points.map(function (p) { return p.x + ',' + p.y; }).join(' ');
+      poly.setAttribute('points', d);
+      if (bars.length) {
+        bars.forEach(function (rect) {
+          var h = 4 + Math.random() * 18;
+          rect.setAttribute('height', h);
+          rect.setAttribute('y', 32 - h);
+        });
+      }
+      requestAnimationFrame(tick);
+    }
+    tick();
+    return function stop() { running = false; };
   }
 
   async function getSignal() {
     if (!checkAccess()) return;
+    chartAnimators.forEach(function (stop) { stop(); });
+    chartAnimators = [];
+
     var btn = $('getSignalBtn');
     btn.disabled = true;
     $('signalMain').style.display = 'none';
@@ -175,25 +228,30 @@
     $('signalResult').style.display = 'none';
 
     var indicators = [
-      { key: 'trend', label: 'Тренд — ' + selectedTf + ' сек', chart: true },
-      { key: 'support', label: 'Поддержка', chart: true },
-      { key: 'move', label: 'Ход за ' + selectedTf + ' сек', chart: true },
-      { key: 'impulse', label: 'Импульс', chart: true },
-      { key: 'session', label: 'Сессия', chart: false },
-      { key: 'ma', label: 'Средние 50/200', chart: true },
-      { key: 'rsi', label: 'RSI', chart: false },
-      { key: 'vol', label: 'Волатильность', chart: true }
+      { key: 'trend', label: 'Тренд — ' + selectedTf + ' сек', type: 'line' },
+      { key: 'support', label: 'Поддержка', type: 'line' },
+      { key: 'move', label: 'Ход за ' + selectedTf + ' сек', type: 'line' },
+      { key: 'impulse', label: 'Импульс', type: 'line' },
+      { key: 'session', label: 'Сессия', type: 'bars' },
+      { key: 'ma', label: 'Средние 50/200', type: 'line' },
+      { key: 'rsi', label: 'RSI', type: 'rsi' },
+      { key: 'vol', label: 'Волатильность', type: 'line' }
     ];
 
     var indBox = $('indicators');
-    indBox.innerHTML = indicators.map(function (ind) {
-      var chartHtml = ind.chart ? makeMiniChart('#6b7280') : '';
-      return '<div class="indicator" id="ind-' + ind.key + '">' +
-        '<div class="label">' + ind.label + '</div>' +
-        '<div class="value">—</div>' +
-        chartHtml +
-        '</div>';
-    }).join('');
+    indBox.innerHTML = '';
+    indicators.forEach(function (ind) {
+      var div = document.createElement('div');
+      div.className = 'indicator';
+      div.id = 'ind-' + ind.key;
+      div.innerHTML = '<div class="label">' + ind.label + '</div><div class="value">—</div>';
+      var chartWrap = document.createElement('div');
+      chartWrap.className = 'chart-wrap';
+      div.appendChild(chartWrap);
+      indBox.appendChild(div);
+      var stop = createAnimatedChart(chartWrap, ind.type);
+      chartAnimators.push(stop);
+    });
 
     var bar = $('analysisBar');
     var status = $('analysisStatus');
@@ -208,7 +266,7 @@
       bar.style.width = (num / indicators.length * 100) + '%';
       var el = $('ind-' + indicators[i].key);
       if (el) el.classList.add('show');
-      await sleep(420);
+      await sleep(450);
     }
 
     try {
@@ -235,7 +293,7 @@
         isDown = last < prev;
       }
 
-      var chartColor = isDown ? '#ff4d4d' : '#00d26a';
+      var chartColor = isDown ? '#ff4d6a' : '#00f0a0';
       indicators.forEach(function (ind) {
         var el = $('ind-' + ind.key);
         if (!el) return;
@@ -243,13 +301,15 @@
         if (ind.key === 'rsi') val = isDown ? '38' : '62';
         if (ind.key === 'support') val = isDown ? 'слабая' : 'сильная';
         el.querySelector('.value').textContent = val;
-        var svg = el.querySelector('svg');
-        if (svg) svg.innerHTML = svg.innerHTML.replace(/stroke="[^"]+"/, 'stroke="' + chartColor + '"');
+        el.querySelector('.value').style.color = chartColor;
+        var poly = el.querySelector('polyline');
+        if (poly) poly.setAttribute('stroke', chartColor);
+        el.querySelectorAll('rect').forEach(function (r) { r.setAttribute('fill', chartColor); });
       });
 
       status.textContent = 'Анализ завершён';
       if (bottom) bottom.textContent = 'GPT 6.0 завершил анализ';
-      await sleep(800);
+      await sleep(900);
       showResult(isDown, reason);
     } catch (e) {
       status.textContent = 'Ошибка получения данных';
@@ -260,6 +320,8 @@
   }
 
   function showResult(isDown, reason) {
+    chartAnimators.forEach(function (stop) { stop(); });
+    chartAnimators = [];
     $('analysisView').style.display = 'none';
     var box = $('signalResult');
     box.style.display = 'block';
