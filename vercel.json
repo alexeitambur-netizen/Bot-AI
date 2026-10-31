@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "server.js": {
-      "includeFiles": "{index.html,scanner-po.js,market-signal.js,signal-engine.js,po-demo.js,ai-bot.js}",
+      "includeFiles": "{index.html,scanner-po.js,market-signal.js,signal-engine.js,po-demo.js,ai-bot.js,ai-bot-3d.css}",
       "maxDuration": 30
     },
     "api/**/*.js": { "maxDuration": 30 }
