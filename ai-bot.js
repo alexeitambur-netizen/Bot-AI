@@ -15,6 +15,7 @@
   var selectedTf = 5;
   var userId = localStorage.getItem('aiBotUserId') || '';
   var pairs = [];
+  var searchQuery = '';
 
   function $(id) { return document.getElementById(id); }
 
@@ -68,33 +69,61 @@
       var data = await res.json();
       pairs = [];
       var cats = data.categories || {};
-      ['currencies', 'crypto', 'commodities'].forEach(function (cat) {
+      Object.keys(cats).forEach(function (cat) {
         (cats[cat] || []).forEach(function (p) {
-          if (p.active && p.payout >= 80) {
-            pairs.push({ symbol: p.symbol, display: p.display || p.symbol, payout: p.payout });
+          if (p.active) {
+            pairs.push({
+              symbol: p.symbol,
+              display: p.display || p.symbol,
+              payout: p.payout || 0,
+              type: cat
+            });
           }
         });
       });
-      pairs.sort(function (a, b) { return b.payout - a.payout; });
-      pairs = pairs.slice(0, 12);
+      pairs.sort(function (a, b) {
+        if (b.payout !== a.payout) return b.payout - a.payout;
+        return (a.display || '').localeCompare(b.display || '');
+      });
       renderPairs();
       renderHot();
     } catch (e) {
       console.error(e);
+      var box = $('pairList');
+      if (box) box.innerHTML = '<div style="color:var(--muted);padding:12px">Не удалось загрузить пары</div>';
     }
+  }
+
+  function getFilteredPairs() {
+    if (!searchQuery) return pairs;
+    var q = searchQuery.toLowerCase();
+    return pairs.filter(function (p) {
+      return (p.display || '').toLowerCase().indexOf(q) >= 0 ||
+             (p.symbol || '').toLowerCase().indexOf(q) >= 0;
+    });
   }
 
   function renderPairs() {
     var box = $('pairList');
+    var countEl = $('pairCount');
     if (!box) return;
-    box.innerHTML = pairs.map(function (p) {
+    var filtered = getFilteredPairs();
+    if (countEl) {
+      countEl.textContent = filtered.length + ' пар' + (searchQuery ? ' найдено' : ' всего');
+    }
+    if (!filtered.length) {
+      box.innerHTML = '<div style="color:var(--muted);padding:12px;text-align:center">Ничего не найдено</div>';
+      return;
+    }
+    box.innerHTML = filtered.map(function (p) {
       var sel = p.symbol === selectedPair ? ' selected' : '';
-      return '<div class="pair-chip' + sel + '" data-symbol="' + p.symbol + '">' +
-        '<div>' + p.display + '</div><div class="payout">' + p.payout + '%</div></div>';
+      return '<div class="pair-item' + sel + '" data-symbol="' + p.symbol + '">' +
+        '<div>' + p.display + '</div>' +
+        '<div class="payout">' + (p.payout || 0) + '%</div></div>';
     }).join('');
-    box.querySelectorAll('.pair-chip').forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        selectedPair = chip.dataset.symbol;
+    box.querySelectorAll('.pair-item').forEach(function (item) {
+      item.addEventListener('click', function () {
+        selectedPair = item.dataset.symbol;
         renderPairs();
       });
     });
@@ -103,7 +132,8 @@
   function renderHot() {
     var box = $('hotPairs');
     if (!box) return;
-    box.innerHTML = pairs.slice(0, 6).map(function (p) {
+    var hot = pairs.filter(function (p) { return p.payout >= 85; }).slice(0, 8);
+    box.innerHTML = hot.map(function (p) {
       return '<div class="pair-chip"><div>' + p.display + '</div><div class="payout">' + p.payout + '%</div></div>';
     }).join('');
   }
@@ -179,7 +209,6 @@
         isDown = last < prev;
       }
 
-      // fill indicators with dummy/real-ish values
       indicators.forEach(function (ind) {
         var el = $('ind-' + ind.key);
         if (!el) return;
@@ -205,8 +234,11 @@
     var dir = isDown ? 'ВНИЗ' : 'ВВЕРХ';
     var cls = isDown ? 'down' : 'up';
     var tfLabel = TIMEFRAMES.find(function (t) { return t.value === selectedTf; }) || { label: selectedTf + 'с' };
+    var pairName = pairs.find(function (p) { return p.symbol === selectedPair; });
+    var pairLabel = pairName ? pairName.display : selectedPair;
     box.innerHTML =
       '<div class="big-signal ' + cls + '">' +
+        '<div style="font-size:13px;color:var(--muted);margin-bottom:6px">' + pairLabel + '</div>' +
         '<div class="direction">' + dir + '</div>' +
         '<div style="margin-top:8px;font-size:14px">Откройте «' + dir + '» на ' + tfLabel.label + ' в PocketOption</div>' +
         '<div class="countdown" id="cd">Войдите за 0:' + String(selectedTf).padStart(2, '0') + '</div>' +
@@ -229,6 +261,14 @@
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
+  var searchInput = $('pairSearch');
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      searchQuery = searchInput.value.trim();
+      renderPairs();
+    });
+  }
+
   $('getSignalBtn').addEventListener('click', getSignal);
 
   $('saveIdBtn').addEventListener('click', function () {
@@ -247,7 +287,6 @@
     initTelegram();
     renderTfs();
     loadPayouts();
-    // today stats placeholder
     var stats = $('todayStats');
     if (stats) stats.innerHTML = 'Сделки: 0<br>Успешные: —<br>Оборот: —';
     showPage('signal');
