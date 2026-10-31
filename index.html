@@ -148,27 +148,81 @@
     }
     .get-signal:active { transform: scale(0.98); }
     .get-signal:disabled { opacity: 0.5; }
+    /* Analysis redesign */
+    .analysis-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .spinner-wrap {
+      width: 48px;
+      height: 48px;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, #7c5cfc, #a78bfa, #7c5cfc);
+      animation: spin 1.2s linear infinite;
+      mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .analysis-title { font-weight: 700; font-size: 18px; }
+    .analysis-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .readings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 8px 0 10px;
+    }
     .analysis-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
-      margin: 12px 0;
     }
     .indicator {
       background: var(--card2);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 12px;
       font-size: 13px;
       opacity: 0;
-      transform: translateY(10px) scale(0.95);
-      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transform: translateY(8px);
+      transition: all 0.35s ease;
+      min-height: 92px;
     }
     .indicator.show {
       opacity: 1;
-      transform: translateY(0) scale(1);
+      transform: translateY(0);
     }
-    .indicator .label { color: var(--muted); font-size: 11px; }
-    .indicator .value { font-weight: 600; margin-top: 4px; min-height: 18px; }
+    .indicator .label { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+    .indicator .value { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+    .mini-chart { width: 100%; height: 28px; display: block; }
+    .progress {
+      height: 5px;
+      background: #2a3348;
+      border-radius: 3px;
+      margin: 12px 0 8px;
+      overflow: hidden;
+    }
+    .progress > div {
+      height: 100%;
+      background: linear-gradient(90deg, #7c5cfc, #a78bfa);
+      width: 0%;
+      transition: width 0.35s ease;
+    }
+    .bottom-status {
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+      padding: 6px 0;
+    }
+    /* Signal result */
     .big-signal {
       text-align: center;
       padding: 30px 16px;
@@ -178,9 +232,7 @@
       transform: scale(0.8);
       animation: signalPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     }
-    @keyframes signalPop {
-      to { opacity: 1; transform: scale(1); }
-    }
+    @keyframes signalPop { to { opacity: 1; transform: scale(1); } }
     .big-signal.down {
       background: linear-gradient(180deg, #2a0a0a, #1a0505);
       border: 1px solid #ff4d4d44;
@@ -257,41 +309,7 @@
     }
     .status-ok { color: var(--green); }
     .status-err { color: var(--red); }
-    .progress {
-      height: 6px;
-      background: #2a3348;
-      border-radius: 3px;
-      margin: 10px 0;
-      overflow: hidden;
-    }
-    .progress > div {
-      height: 100%;
-      background: linear-gradient(90deg, var(--purple), #a78bfa);
-      width: 0%;
-      transition: width 0.35s ease;
-      box-shadow: 0 0 10px var(--purple);
-    }
     .pair-count { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-    .analysis-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-    .analysis-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--purple), #a78bfa);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      animation: pulseIcon 1.2s ease-in-out infinite;
-    }
-    @keyframes pulseIcon {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-    }
   </style>
 </head>
 <body>
@@ -331,15 +349,20 @@
     </div>
     <div id="analysisView" style="display:none">
       <div class="analysis-card">
-        <div class="analysis-header">
-          <div class="analysis-icon">✨</div>
+        <div class="analysis-top">
+          <div class="spinner-wrap"><div class="spinner"></div></div>
           <div>
-            <div style="font-weight:700">Анализ...</div>
-            <div style="font-size:12px;color:var(--muted)" id="analysisStatus">GPT 6.0 анализирует...</div>
+            <div class="analysis-title">Анализ...</div>
+            <div class="analysis-sub" id="analysisStatus">Взвешиваю всё...</div>
           </div>
         </div>
-        <div class="progress"><div id="analysisBar"></div></div>
+        <div class="readings-header">
+          <span>Показания • реальный рынок</span>
+          <span id="progressCount">0 из 8</span>
+        </div>
         <div class="analysis-grid" id="indicators"></div>
+        <div class="progress"><div id="analysisBar"></div></div>
+        <div class="bottom-status" id="bottomStatus">GPT 6.0 анализирует...</div>
       </div>
     </div>
     <div id="signalResult" style="display:none"></div>
@@ -363,7 +386,7 @@
     <button data-page="profile">Профиль</button>
   </div>
 
-  <script src="/signal-engine.js?v=3"></script>
-  <script src="/ai-bot.js?v=3"></script>
+  <script src="/signal-engine.js?v=4"></script>
+  <script src="/ai-bot.js?v=4"></script>
 </body>
 </html>
