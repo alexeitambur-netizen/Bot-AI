@@ -247,23 +247,64 @@
     container.appendChild(svg);
     var c = color || '#36d8f2';
     var running = true;
+    var uid = 'a' + Math.random().toString(36).slice(2, 7);
 
     if (type === 'line') {
-      svg.innerHTML = '<g opacity="0.9"><path d="M10 40 L25 32 L40 28 L55 22 L70 18 L85 14" fill="none" stroke="' + c + '" stroke-width="2.5" stroke-linecap="round"/><path d="M10 40 L25 32 L40 28 L55 22 L70 18 L85 14 L85 48 L10 48 Z" fill="' + c + '" opacity="0.15"/><circle cx="85" cy="14" r="3" fill="' + c + '"/><path d="M75 8 L85 14 L80 18" fill="none" stroke="' + c + '" stroke-width="1.5"/></g>';
+      svg.innerHTML = '<defs><linearGradient id="' + uid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + c + '" stop-opacity="0.6"/><stop offset="100%" stop-color="' + c + '" stop-opacity="0"/></linearGradient></defs>' +
+        '<g><polygon id="' + uid + 'a" fill="url(#' + uid + ')" points="8,42 22,34 36,30 50,24 64,20 78,16 92,12 92,50 8,50"/>' +
+        '<polyline id="' + uid + 'l" fill="none" stroke="' + c + '" stroke-width="2.5" stroke-linecap="round" points="8,42 22,34 36,30 50,24 64,20 78,16 92,12"/>' +
+        '<circle cx="92" cy="12" r="3" fill="' + c + '"><animate attributeName="r" values="2;4;2" dur="1.2s" repeatCount="indefinite"/></circle></g>';
     } else if (type === 'support') {
-      svg.innerHTML = '<g><ellipse cx="50" cy="38" rx="28" ry="8" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.6"/><ellipse cx="50" cy="38" rx="20" ry="5" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.8"/><path d="M30 30 Q50 20 70 30" fill="none" stroke="' + c + '" stroke-width="2"/><path d="M35 26 Q50 16 65 26" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.7"/><circle cx="50" cy="18" r="3" fill="' + c + '"/></g>';
+      svg.innerHTML = '<g>' +
+        '<ellipse cx="50" cy="40" rx="30" ry="8" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.4"><animate attributeName="rx" values="22;32;22" dur="2s" repeatCount="indefinite"/></ellipse>' +
+        '<ellipse cx="50" cy="40" rx="22" ry="5" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.7"><animate attributeName="rx" values="16;26;16" dur="2s" begin="0.3s" repeatCount="indefinite"/></ellipse>' +
+        '<path d="M28 28 Q50 16 72 28" fill="none" stroke="' + c + '" stroke-width="2"/>' +
+        '<circle cx="50" cy="16" r="3" fill="' + c + '"><animate attributeName="cy" values="14;18;14" dur="1.5s" repeatCount="indefinite"/></circle></g>';
     } else if (type === 'move') {
-      svg.innerHTML = '<g><rect x="22" y="8" width="56" height="40" rx="4" fill="none" stroke="' + c + '" stroke-width="1.5"/><path d="M38 20 L38 36 M46 18 L46 38 M54 22 L54 34 M62 16 L62 40" fill="none" stroke="' + c + '" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="28" r="2" fill="' + c + '"/></g>';
+      svg.innerHTML = '<g>' +
+        '<rect x="18" y="6" width="64" height="44" rx="4" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.6"/>' +
+        '<rect x="32" y="16" width="6" height="24" rx="2" fill="' + c + '"><animate attributeName="height" values="16;28;16" dur="1s" repeatCount="indefinite"/><animate attributeName="y" values="20;14;20" dur="1s" repeatCount="indefinite"/></rect>' +
+        '<rect x="42" y="14" width="6" height="28" rx="2" fill="' + c + '"><animate attributeName="height" values="20;32;20" dur="1s" begin="0.2s" repeatCount="indefinite"/><animate attributeName="y" values="18;12;18" dur="1s" begin="0.2s" repeatCount="indefinite"/></rect>' +
+        '<rect x="52" y="18" width="6" height="20" rx="2" fill="' + c + '"><animate attributeName="height" values="14;26;14" dur="1s" begin="0.4s" repeatCount="indefinite"/><animate attributeName="y" values="22;16;22" dur="1s" begin="0.4s" repeatCount="indefinite"/></rect>' +
+        '<rect x="62" y="12" width="6" height="32" rx="2" fill="' + c + '"><animate attributeName="height" values="22;36;22" dur="1s" begin="0.6s" repeatCount="indefinite"/><animate attributeName="y" values="16;8;16" dur="1s" begin="0.6s" repeatCount="indefinite"/></rect></g>';
     } else if (type === 'impulse') {
-      svg.innerHTML = '<g><ellipse cx="50" cy="22" rx="12" ry="10" fill="' + c + '" opacity="0.3"/><path d="M40 20 Q45 12 50 14 Q55 12 60 20 Q58 28 50 30 Q42 28 40 20" fill="' + c + '" opacity="0.6"/><line x1="50" y1="8" x2="50" y2="36" stroke="' + c + '" stroke-width="1" opacity="0.5"/><line x1="30" y1="22" x2="70" y2="22" stroke="' + c + '" stroke-width="1" opacity="0.5"/><rect x="28" y="38" width="4" height="12" rx="1" fill="' + c + '"/><rect x="36" y="34" width="4" height="16" rx="1" fill="' + c + '"/><rect x="44" y="30" width="4" height="20" rx="1" fill="' + c + '"/><rect x="52" y="32" width="4" height="18" rx="1" fill="' + c + '"/><rect x="60" y="36" width="4" height="14" rx="1" fill="' + c + '"/></g>';
+      svg.innerHTML = '<g>' +
+        '<ellipse cx="50" cy="20" rx="14" ry="11" fill="' + c + '" opacity="0.25"><animate attributeName="rx" values="12;16;12" dur="1.5s" repeatCount="indefinite"/></ellipse>' +
+        '<path d="M38 18 Q44 10 50 12 Q56 10 62 18 Q60 28 50 30 Q40 28 38 18" fill="' + c + '" opacity="0.7"/>' +
+        '<line x1="50" y1="6" x2="50" y2="34" stroke="' + c + '" stroke-width="1" opacity="0.4"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="0.8s" repeatCount="indefinite"/></line>' +
+        '<line x1="28" y1="20" x2="72" y2="20" stroke="' + c + '" stroke-width="1" opacity="0.4"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="0.8s" begin="0.2s" repeatCount="indefinite"/></line>' +
+        '<rect x="26" y="36" width="5" height="14" rx="1" fill="' + c + '"><animate attributeName="height" values="8;16;8" dur="0.6s" repeatCount="indefinite"/><animate attributeName="y" values="42;34;42" dur="0.6s" repeatCount="indefinite"/></rect>' +
+        '<rect x="35" y="32" width="5" height="18" rx="1" fill="' + c + '"><animate attributeName="height" values="10;20;10" dur="0.6s" begin="0.1s" repeatCount="indefinite"/><animate attributeName="y" values="40;30;40" dur="0.6s" begin="0.1s" repeatCount="indefinite"/></rect>' +
+        '<rect x="44" y="28" width="5" height="22" rx="1" fill="' + c + '"><animate attributeName="height" values="12;24;12" dur="0.6s" begin="0.2s" repeatCount="indefinite"/><animate attributeName="y" values="38;26;38" dur="0.6s" begin="0.2s" repeatCount="indefinite"/></rect>' +
+        '<rect x="53" y="30" width="5" height="20" rx="1" fill="' + c + '"><animate attributeName="height" values="10;18;10" dur="0.6s" begin="0.3s" repeatCount="indefinite"/><animate attributeName="y" values="40;32;40" dur="0.6s" begin="0.3s" repeatCount="indefinite"/></rect>' +
+        '<rect x="62" y="34" width="5" height="16" rx="1" fill="' + c + '"><animate attributeName="height" values="8;14;8" dur="0.6s" begin="0.4s" repeatCount="indefinite"/><animate attributeName="y" values="42;36;42" dur="0.6s" begin="0.4s" repeatCount="indefinite"/></rect></g>';
     } else if (type === 'session') {
-      svg.innerHTML = '<g><path d="M15 42 L50 20 L85 42" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.4"/><path d="M25 42 L50 26 L75 42" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.6"/><circle cx="50" cy="36" r="8" fill="none" stroke="' + c + '" stroke-width="2"/><circle cx="50" cy="36" r="3" fill="' + c + '" opacity="0.5"/></g>';
+      svg.innerHTML = '<g>' +
+        '<path d="M12 44 L50 18 L88 44" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.3"/>' +
+        '<path d="M22 44 L50 24 L78 44" fill="none" stroke="' + c + '" stroke-width="1.5" opacity="0.5"/>' +
+        '<circle cx="50" cy="36" r="10" fill="none" stroke="' + c + '" stroke-width="2"/>' +
+        '<circle id="' + uid + 'd" cx="50" cy="36" r="4" fill="' + c + '"><animateTransform attributeName="transform" type="rotate" from="0 50 36" to="360 50 36" dur="2s" repeatCount="indefinite"/></circle></g>';
     } else if (type === 'ma') {
-      svg.innerHTML = '<g><rect x="35" y="42" width="30" height="6" rx="2" fill="' + c + '" opacity="0.4"/><polygon points="50,12 58,28 42,28" fill="' + c + '" opacity="0.7"/><polygon points="50,18 54,28 46,28" fill="' + c + '"/><rect x="46" y="28" width="8" height="14" fill="' + c + '" opacity="0.8"/></g>';
+      svg.innerHTML = '<g>' +
+        '<rect x="32" y="44" width="36" height="6" rx="2" fill="' + c + '" opacity="0.3"/>' +
+        '<polygon points="50,10 60,30 40,30" fill="' + c + '" opacity="0.5"><animate attributeName="points" values="50,10 60,30 40,30;50,8 62,32 38,32;50,10 60,30 40,30" dur="2s" repeatCount="indefinite"/></polygon>' +
+        '<polygon points="50,16 56,30 44,30" fill="' + c + '" opacity="0.8"/>' +
+        '<rect x="46" y="30" width="8" height="14" fill="' + c + '" opacity="0.9"/></g>';
     } else if (type === 'rsi') {
-      svg.innerHTML = '<g><path d="M12 40 L22 32 L32 36 L42 24 L52 28 L62 18" fill="none" stroke="' + c + '" stroke-width="2"/><rect x="68" y="22" width="20" height="14" rx="2" fill="none" stroke="' + c + '" stroke-width="1.5"/><polygon points="78,22 70,30 86,30" fill="' + c + '" opacity="0.4"/><rect x="20" y="44" width="40" height="4" rx="2" fill="' + c + '" opacity="0.6"/></g>';
+      svg.innerHTML = '<g>' +
+        '<path d="M10 42 L20 34 L30 38 L40 26 L50 30 L60 20" fill="none" stroke="' + c + '" stroke-width="2"/>' +
+        '<rect x="66" y="20" width="22" height="16" rx="2" fill="none" stroke="' + c + '" stroke-width="1.5"/>' +
+        '<polygon points="77,20 68,30 86,30" fill="' + c + '" opacity="0.5"><animate attributeName="opacity" values="0.3;0.8;0.3" dur="1.2s" repeatCount="indefinite"/></polygon>' +
+        '<rect x="16" y="46" width="48" height="4" rx="2" fill="' + c + '" opacity="0.6"><animate attributeName="width" values="30;48;30" dur="1.5s" repeatCount="indefinite"/></rect></g>';
     } else if (type === 'vol') {
-      svg.innerHTML = '<g><rect x="20" y="48" width="60" height="4" rx="1" fill="' + c + '" opacity="0.3"/><rect x="24" y="36" width="6" height="12" fill="' + c + '"/><rect x="34" y="28" width="6" height="20" fill="' + c + '"/><rect x="44" y="22" width="6" height="26" fill="' + c + '"/><rect x="54" y="30" width="6" height="18" fill="' + c + '"/><rect x="64" y="34" width="6" height="14" fill="' + c + '"/><rect x="74" y="38" width="6" height="10" fill="' + c + '"/></g>';
+      svg.innerHTML = '<g>' +
+        '<rect x="16" y="50" width="68" height="4" rx="1" fill="' + c + '" opacity="0.25"/>' +
+        '<rect x="20" y="34" width="7" height="16" rx="1" fill="' + c + '"><animate attributeName="height" values="10;18;10" dur="0.8s" repeatCount="indefinite"/><animate attributeName="y" values="40;32;40" dur="0.8s" repeatCount="indefinite"/></rect>' +
+        '<rect x="31" y="26" width="7" height="24" rx="1" fill="' + c + '"><animate attributeName="height" values="14;26;14" dur="0.8s" begin="0.15s" repeatCount="indefinite"/><animate attributeName="y" values="36;24;36" dur="0.8s" begin="0.15s" repeatCount="indefinite"/></rect>' +
+        '<rect x="42" y="20" width="7" height="30" rx="1" fill="' + c + '"><animate attributeName="height" values="18;32;18" dur="0.8s" begin="0.3s" repeatCount="indefinite"/><animate attributeName="y" values="32;18;32" dur="0.8s" begin="0.3s" repeatCount="indefinite"/></rect>' +
+        '<rect x="53" y="28" width="7" height="22" rx="1" fill="' + c + '"><animate attributeName="height" values="12;22;12" dur="0.8s" begin="0.45s" repeatCount="indefinite"/><animate attributeName="y" values="38;28;38" dur="0.8s" begin="0.45s" repeatCount="indefinite"/></rect>' +
+        '<rect x="64" y="32" width="7" height="18" rx="1" fill="' + c + '"><animate attributeName="height" values="10;16;10" dur="0.8s" begin="0.6s" repeatCount="indefinite"/><animate attributeName="y" values="40;34;40" dur="0.8s" begin="0.6s" repeatCount="indefinite"/></rect>' +
+        '<rect x="75" y="36" width="7" height="14" rx="1" fill="' + c + '"><animate attributeName="height" values="8;14;8" dur="0.8s" begin="0.75s" repeatCount="indefinite"/><animate attributeName="y" values="42;36;42" dur="0.8s" begin="0.75s" repeatCount="indefinite"/></rect></g>';
     }
 
     return function () { running = false; };
