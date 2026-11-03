@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>AI Bot — Chat GPT Trade Bot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/ai-bot-3d.css?v=21">
+  <link rel="stylesheet" href="/ai-bot-3d.css?v=22">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     body {
@@ -236,26 +236,27 @@
 </head>
 <body class="ai3d">
   <div class="header">
-    <div><span class="live">LIVE</span><span class="title">Chat GPT Trade Bot</span></div>
+    <div class="brand-lockup"><span class="brand-mark" aria-hidden="true"><span>✦</span></span><span class="brand-copy"><span class="live"><i></i> LIVE</span><span class="title">NEBULA <b>AI</b></span><span class="brand-caption">MARKET INTELLIGENCE TERMINAL</span></span></div>
     <div id="userBadge" style="font-size:11px;color:#a8c5d9"></div>
   </div>
   <div class="tabs-nav">
-    <button data-page="signal" class="active">Сигнал</button>
-    <button data-page="profile">Профиль</button>
+    <button data-page="signal" class="active"><span class="nav-icon">⌁</span>Сканер</button>
+    <button data-page="profile"><span class="nav-icon">◉</span>Профиль</button>
   </div>
   <div id="page-signal" class="page active">
     <div id="signalMain">
       <div class="ai3d-panel">
+        <div class="section-kicker"><span class="kicker-icon">◈</span><span>ПАРАМЕТРЫ СКАНИРОВАНИЯ</span><span class="kicker-line"></span><span class="kicker-state">READY</span></div>
         <div class="tf-selector" id="tfSelector">
           <span class="label">Таймфрейм</span>
           <span class="value" id="tfValue">5 сек</span>
         </div>
-        <div style="font-size:12px;color:#a8c5d9;margin-bottom:8px">Категория</div>
+        <div class="field-heading"><span>◫</span> КАТЕГОРИЯ АКТИВОВ</div>
         <div class="cat-tabs" id="catTabs"></div>
-        <input type="text" class="search-box" id="pairSearch" placeholder="Поиск пары...">
+        <div class="search-wrap"><span>⌕</span><input type="text" class="search-box" id="pairSearch" placeholder="Поиск торгового инструмента..."></div>
         <div class="pair-count" id="pairCount"></div>
         <div id="pairGrid" class="pair-grid"></div>
-        <button class="get-signal" id="getSignalBtn">⚙️ Получить сигнал</button>
+        <button class="get-signal" id="getSignalBtn"><span class="button-orbit">✧</span><span>ЗАПУСТИТЬ AI-СКАНИРОВАНИЕ</span><span class="button-arrow">↗</span></button>
       </div>
     </div>
     <div id="analysisView" style="display:none">
@@ -263,23 +264,23 @@
         <div class="analysis-top">
           <div class="spinner"></div>
           <div>
-            <div class="analysis-title">Анализ...</div>
-            <div class="analysis-sub" id="analysisStatus">Взвешиваю всё...</div>
+            <div class="analysis-title">NEBULA SCAN ENGINE</div>
+            <div class="analysis-sub" id="analysisStatus">Инициализация рыночных модулей...</div>
           </div>
         </div>
         <div class="readings-header">
-          <span>Показания • реальный рынок</span>
+          <span>◈ ПОКАЗАТЕЛИ РЫНКА</span>
           <span id="progressCount">0 из 8</span>
         </div>
         <div class="analysis-grid" id="indicators"></div>
         <div class="progress"><div id="analysisBar"></div></div>
-        <div class="bottom-status" id="bottomStatus">GPT 6.0 анализирует...</div>
+        <div class="scan-module-row"><span><i></i> PRICE ACTION</span><span><i></i> MOMENTUM</span><span><i></i> VOLATILITY</span></div><div class="bottom-status" id="bottomStatus">AI ENGINE ANALYZING MARKET...</div>
       </div>
     </div>
   </div>
   <div id="page-profile" class="page">
     <div class="ai3d-panel">
-      <h3 style="color:#fff">Профиль</h3>
+      <h3 class="profile-heading"><span>◉</span> ЛИЧНЫЙ ПРОФИЛЬ</h3>
       <p style="color:#a8c5d9;font-size:13px;margin:8px 0">Доступ к сигналам только по User ID</p>
       <div id="tgAuto" style="margin:10px 0;font-size:13px;color:#e8f6ff"></div>
       <label style="font-size:12px;color:#a8c5d9">User ID (Telegram)</label>
@@ -289,8 +290,8 @@
     </div>
   </div>
   <div class="bottom-nav">
-    <button data-page="signal" class="active">Сигнал</button>
-    <button data-page="profile">Профиль</button>
+    <button data-page="signal" class="active"><span class="nav-icon">⌁</span>Сканер</button>
+    <button data-page="profile"><span class="nav-icon">◉</span>Профиль</button>
   </div>
   <div id="tfOverlay" class="tf-overlay hidden">
     <div class="tf-modal">
@@ -301,7 +302,7 @@
   <div id="signalOverlay" class="signal-overlay hidden">
     <div id="signalCard"></div>
   </div>
-  <script src="/signal-engine.js?v=21"></script>
-  <script src="/ai-bot.js?v=21"></script>
+  <script src="/signal-engine.js?v=22"></script>
+  <script src="/ai-bot.js?v=22"></script>
 </body>
 </html>
